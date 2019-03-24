@@ -15,13 +15,21 @@ D = 10; %cm distance from eyes to screen
 
 distanceFalloff = 1; %how much does information content fall off with distance to object
 
-%TS
-phiTS = 20; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
-E_dTS = 0; % cm, distance between eyes
+human = 1;
+treeShrew = 1;
+%mouse = 1;
 
+if human
 %H
 phiH = 0;
 E_dH = 0;
+end
+
+if treeShrew
+%TS
+phiTS = 20; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
+E_dTS = 0; % cm, distance between eyes
+end
 
 %optics parameters:
 tsSigma = 3; % max cone density is 36k at center, but how long before it drops to 12k?
@@ -48,7 +56,7 @@ sumTSI = [];
 
 
 for i = 1:length(screen)
-
+if treeShrew
 %TS    
 leftTSEcc(i) = atand((screen(i)-(E_dTS/2))/D)-phiTS;
 leftTSConeDensity(i) = normpdf(leftTSEcc(i),0,tsSigma)*(24000/.4)+12000;
@@ -60,11 +68,15 @@ rightTSConeDensity(i) = normpdf(rightTSEcc(i),0,tsSigma)*(24000/.4)+12000;
 rightTSDistance(i) = D/cosd(phiTS+rightTSEcc(i));
 rightTSI(i) = rightTSConeDensity(i)/(rightTSDistance(i)^1);
 
+sumTSI(i) = leftTSI(i) + rightTSI(i);
+end
+
+if human
 %human
 leftHumanEcc(i) = atand((screen(i)-(E_dH/2))/D)-phiH;
 leftHumanConeDensity(i) = coneDensityReadData('eccentricity', abs((leftHumanEcc(i))*(3/1000)), 'whichEye', 'left');
 if(isnan(leftHumanConeDensity(i)))
-    leftHumanConeDensity(i) = 4.8145e+03;
+    leftHumanConeDensity(i) = 4.8145e+03; %would love a better way of doing this- maybe read in all data first, then get lowest, and then us that?
 end
 leftHumanDistance(i) = D/cosd(phiH+leftHumanEcc(i));
 leftHumanI(i) = leftHumanConeDensity(i)/(leftHumanDistance(i)^1);
@@ -77,18 +89,25 @@ end
 rightHumanDistance(i) = D/cosd(phiH+rightHumanEcc(i));
 rightHumanI(i) = rightHumanConeDensity(i)/(rightHumanDistance(i)^1);
 
-%%
 sumHumanI(i) = leftHumanI(i) + rightHumanI(i);
-sumTSI(i) = leftTSI(i) + rightTSI(i);
+end
+
+%%
+
+
 
 end
 
 %hold on
 hold on
+if treeShrew
 plot(screen,sumTSI)
+end
+if human
 plot(screen,sumHumanI)
+end
 xlabel('Horizontal Meridian (cm)')
 ylabel('Cone Density Combined Across Eyes')
-title(sprintf('Information Effiency Due to Eye Angle \n D=%.0f cm, \\phi=%.0f degrees, E_d = %.0f cm', D,phi,E_dTS))
+%title(sprintf('Information Effiency Due to Eye Angle \n D=%.0f cm, \\phi=%.0f degrees, E_d = %.0f cm', D,phi,E_dTS))
 hold off
 %set(gca, 'XLabel', 'Horizontal Meridian (cm)','YLabel','Cone Density Combined Across Eyes')

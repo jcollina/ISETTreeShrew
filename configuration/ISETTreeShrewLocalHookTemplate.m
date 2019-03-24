@@ -1,82 +1,48 @@
-function ISETTreeShrewLocalHookTemplate
-%  LFContrastAnalsysisLocalHook
+% ISETTreeShewLocalHookTemplate
 %
-% Configure things for working on the  mrTOMEAnalysis project.
-%
-% For use with the ToolboxToolbox.
-%
-% If you 'git clone' ILFContrastAnalsysis into your ToolboxToolbox "projectRoot"
-% folder, then run in MATLAB
-%   tbUseProject('mrTOMEAnalysis')
-% ToolboxToolbox will set up IBIOColorDetect and its dependencies on
-% your machine.
-%
-% As part of the setup process, ToolboxToolbox will copy this file to your
-% ToolboxToolbox localToolboxHooks directory (minus the "Template" suffix).
-% The defalt location for this would be
-%   ~/localToolboxHooks/LFContrastAnalsysisLocalHook.m
-%
-% Each time you run tbUseProject('mrTOMEAnalysis'), ToolboxToolbox will
-% execute your local copy of this file to do setup for LFContrastAnalsysis.
-%
-% You should edit your local copy with values that are correct for your
-% local machine, for example the output directory location.
-%
+% Template for setting preferences and other configuration things, for the
+% ISETTreeShrew project.
 
+% 10/23/18  dhb   Wrote it.
 
-%% Say hello.
-fprintf('mriTOMEAnalysis local hook.\n');
-projectName = 'mriTOMEAnalysis';
+%% Define project
+toolboxName = 'ISETTreeShrew';
 
-%% Delete any old prefs
-if (ispref(projectName))
-    rmpref(projectName);
+%% Clear out old preferences
+if (ispref(toolboxName))
+    rmpref(toolboxName);
 end
 
-%% Specify base paths for materials and data
-[~, userID] = system('whoami');
-userID = strtrim(userID);
-switch userID
-    case {'dhb'}
-        materialsBasePath = ['/Users1' '/Dropbox (Aguirre-Brainard Lab)/TOME_materials'];
-        TOME_dataBasePath = ['/Users1' '/Dropbox (Aguirre-Brainard Lab)/TOME_data/'];     
-    case {'mbarnett'}
-        materialsBasePath = ['/home/mbarnett/Dropbox (Aguirre-Brainard Lab)/TOME_materials'];
-        TOME_dataBasePath = ['/home/mbarnett/Dropbox (Aguirre-Brainard Lab)/TOME_data/'];
-    case {'harrisonmcadams'}
-        materialsBasePath = ['/Users/' userID '/Dropbox-Aguirre-Brainard-Lab/TOME_materials'];
-        TOME_dataBasePath = ['/Users/' userID '/Dropbox-Aguirre-Brainard-Lab/TOME_data/'];
-        TOME_analysisBasePath = ['/Users/' userID '/Dropbox-Aguirre-Brainard-Lab/MELA_analysis/'];
-        TOME_processingBasePath = ['/Users/' userID '/Dropbox (Aguirre-Brainard Lab)/TOME_processing/'];
-        
-    otherwise
-        materialsBasePath = ['/Users/' userID '/Dropbox (Aguirre-Brainard Lab)/TOME_materials'];
-        TOME_dataBasePath = ['/Users/' userID '/Dropbox (Aguirre-Brainard Lab)/TOME_data/'];
-        TOME_analysisBasePath = ['/Users/' userID '/Dropbox (Aguirre-Brainard Lab)/MELA_analysis/'];
-        TOME_processingBasePath = ['/Users/' userID '/Dropbox (Aguirre-Brainard Lab)/TOME_processing/'];
+%% Specify project location
+istsBaseDir = tbLocateProject('ISETTreeShrew');
 
+% Figure out where baseDir for other kinds of data files is.
+%
+% Can only do this when we have GetComputerInfo available.
+if (exist('GetComputerInfo','file'))
+    sysInfo = GetComputerInfo();
+    switch (sysInfo.localHostName)
+        case 'eagleray'
+            % DHB's desktop
+            baseDir = fullfile(filesep,'Volumes','Users1','Dropbox (Aguirre-Brainard Lab)');
+            
+        case {'Manta', 'Manta-2'}
+            % Nicolas's iMac
+            baseDir = fullfile(filesep,'Volumes','DropBoxDisk/Dropbox','Dropbox (Aguirre-Brainard Lab)');
+            
+        otherwise
+            % Some unspecified machine, try user specific customization
+            switch(sysInfo.userShortName)
+                % Could put user specific things in, but at the moment generic
+                % is good enough.
+                otherwise
+                    baseDir = ['/Users/' sysInfo.userShortName '/Dropbox (Aguirre-Brainard Lab)'];
+            end
+    end
 end
 
-%% Specify where output goes
 
-if ismac
-    % Code to run on Mac plaform
-    setpref(projectName,'analysisScratchDir','/tmp/flywheel');
-    setpref(projectName,'projectRootDir',fullfile('/Users/',userID,'/Documents/flywheel',projectName));
-    setpref(projectName,'TOMEDataPath', TOME_dataBasePath);
-    setpref(projectName, 'TOME_analysisPath', TOME_analysisBasePath);
-        setpref(projectName, 'TOME_processingPath', TOME_processingBasePath);
 
-elseif isunix
-    % Code to run on Linux plaform
-    setpref(projectName,'analysisScratchDir','/tmp/flywheel');
-    setpref(projectName,'projectRootDir',fullfile('/home/',userID,'/Documents/flywheel',projectName));
-    setpref(projectName,'TOMEDataPath', TOME_dataBasePath);
-    setpref(projectName, 'TOME_analysisPath', TOME_analysisBasePath);
 
-elseif ispc
-    % Code to run on Windows platform
-    warning('No supported for PC')
-else
-    disp('What are you using?')
-end
+
+
