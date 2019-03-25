@@ -6,7 +6,7 @@
 % 10/23/18  dhb   Wrote it.
 
 %% Define project
-toolboxName = 'ISETTreeShrew';
+toolboxName = 'ISETTreeShrewCode';
 
 %% Clear out old preferences
 if (ispref(toolboxName))
@@ -14,7 +14,7 @@ if (ispref(toolboxName))
 end
 
 %% Specify project location
-istsBaseDir = tbLocateProject('ISETTreeShrew');
+istsBaseDir = tbLocateProject('ISETTreeShrewCode');
 
 % Figure out where baseDir for other kinds of data files is.
 %

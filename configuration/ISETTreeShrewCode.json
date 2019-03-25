@@ -4,13 +4,13 @@
 		"hook": "",
 		"importance": "",
 		"localHookTemplate": "configuration/ISETTreeShrewLocalHookTemplate.m",
-		"name": "ISETTreeShrew",
+		"name": "ISETTreeShrewCode",
 		"pathPlacement": "append",
 		"subfolder": ["toolbox", "tutorials", "compute", "validations"],
 		"toolboxRoot": "",
 		"type": "git",
 		"update": "",
-		"url": "https://github.com/isetbio/ISETTreeShrew.git"
+		"url": "https://jcollina@github.com/jcollina/ISETTreeShrewCode.git"
 	},
 	{
 		"flavor": "",

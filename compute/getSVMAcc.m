@@ -16,7 +16,7 @@ emPath = zeros(nTrialsNum, emPathLength, 2);
 % Generate wavefront-aberration derived ts optics
 theOI = oiTreeShrewCreate();
 
-if 
+
     theOI = oiTreeShrewCreate(...
         'inFocusPSFsigmaMicrons', psfSigma ... % 40 microns
     );
