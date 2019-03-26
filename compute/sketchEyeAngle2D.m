@@ -120,30 +120,29 @@ end
 %%
 for x = 1:size(screen,1) % x
    for y = 1:size(screen,1) % y 
-       %%
-    x = 1
-    y = 3
+
+
     coords = screen{x,y};
-    screenX = coords(1);
-    screenY = coords(2);
+    screenX = coords(1)
+    screenY = coords(2)
     
     %if treeShrew
-        
-        
-        leftTSEccH = atand((screenX-(E_dTS/2))/D)+phiTS;
-        leftTSEccV = atand((screenY-(E_dTS/2))/D);
-        
-        %
-        
-     %%   
-        
-        if abs(leftTSEcc(x,y)) > maxEccTS
+    if screenY >= 0
+        angle = atand(screenY/screenX);
+    else
+        angle = 180+atand(screenY/screenX);
+    end
+        actualDistance = sqrt(sqrt(D^2+screenX^2)+screenY^2);
+        observedDistance = sqrt(sqrt(D^2+(screenX+D*cos(phiTS))^2)+screenY^2);
+        TSEcc = atand(screenY/observedDistance);
+
+        if abs(TSEcc(x,y)) > maxEccTS
             leftTSConeDensity(x,y) = 0;
         else
             leftTSConeDensity(x,y) = normpdf(leftTSEcc(x,y),0,tsSigma)*(24000/.4)+12000;
         end
         
-        leftTSDistance(x,y) = D/cosd(phiTS+leftTSEcc(x,y));
+        %leftTSDistance(x,y) = D/cosd(phiTS+leftTSEcc(x,y));
         
         
         leftTSI(x,y) = leftTSConeDensity(x,y)/(leftTSDistance(x,y)^1);

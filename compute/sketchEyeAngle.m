@@ -120,7 +120,7 @@ for i = 1:length(screen)
         
         leftTSDistance(i) = D/cosd(phiTS+leftTSEcc(i));
         
-        
+       
         leftTSI(i) = leftTSConeDensity(i)/(leftTSDistance(i)^1);
         
         
