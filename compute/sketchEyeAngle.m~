@@ -22,11 +22,6 @@
 %surface area of sphere varies with radius as r^2, so for approx, just
 %multiply cone density by ((axial length)/2)
 
-%if all we care about is cone density, then we can see clear areas in the visual field where
-%the tree shrew AND mouse eyes have more cones/mm^2 than humans. But humans
-%have much bigger eyes, so even in those areas, there are more total cones
-%in the human eye for each segment of visual area.
-
 
 %choose size of screen
 screen = -10:.1:10;
@@ -112,7 +107,6 @@ for i = 1:length(screen)
     if treeShrew
         %TS
         leftTSEcc(i) = atand((screen(i)-(E_dTS/2))/D)+phiTS;
-        
         if abs(leftTSEcc(i)) > maxEccTS
             leftTSConeDensity(i) = 0;
         else
@@ -121,7 +115,9 @@ for i = 1:length(screen)
         
         leftTSDistance(i) = D/cosd(phiTS+leftTSEcc(i));
         
+        
         leftTSI(i) = leftTSConeDensity(i)/(leftTSDistance(i)^1);
+        
         
         rightTSEcc(i) = atand((-screen(i)-(E_dTS/2))/D)+phiTS;
         if abs(rightTSEcc(i)) > maxEccTS
@@ -174,7 +170,7 @@ for i = 1:length(screen)
         rightHumanI(i) = rightHumanConeDensity(i)/(rightHumanDistance(i)^1);
         
         sumConeDensityHuman(i) = leftHumanConeDensity(i) + rightHumanConeDensity(i);
-        sumHumanI(i) = (leftHumanI(i) + rightHumanI(i))*(axialLengthHuman/2)^2;
+        sumHumanI(i) = leftHumanI(i) + rightHumanI(i);
     end
     
     
@@ -206,8 +202,9 @@ for i = 1:length(screen)
         
         sumConeDensityMouse(i) = leftMouseConeDensity(i) + rightMouseConeDensity(i);
         
-        sumMouseI(i) = (leftMouseI(i) + rightMouseI(i))*(axialLengthMouse/2)^2;
+        sumMouseI(i) = leftMouseI(i) + rightMouseI(i);
     end
+
 
 end
 

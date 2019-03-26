@@ -45,42 +45,42 @@ if human
     phiH = 0; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
     E_d_H = 0; % cm, distance between eyes
     
-    L_CD_H = zeros(screenSize);
-    R_CD_H = zeros(screenSize);
+    L_CD_H = zeros(size(screen));
+    R_CD_H = zeros(size(screen));
     
-    L_I_H = zeros(screenSize);
-    R_I_H = zeros(screenSize);
+    L_I_H = zeros(size(screen));
+    R_I_H = zeros(size(screen));
     
-    sum_CD_H = zeros(screenSize);
-    sum_I_H = zeros(screenSize);
+    sum_CD_H = zeros(size(screen));
+    sum_I_H = zeros(size(screen));
 end
 
 if treeShrew
     phiTS = 0; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
     E_d_TS = 0; % cm, distance between eyes
     
-    L_CD_TS = zeros(screenSize);
-    R_CD_TS = zeros(screenSize);
+    L_CD_TS = zeros(size(screen));
+    R_CD_TS = zeros(size(screen));
     
-    L_I_TS = zeros(screenSize);
-    R_I_TS = zeros(screenSize);
+    L_I_TS = zeros(size(screen));
+    R_I_TS = zeros(size(screen));
     
-    sum_CD_TS = zeros(screenSize);
-    sum_I_TS = zeros(screenSize);
+    sum_CD_TS = zeros(size(screen));
+    sum_I_TS = zeros(size(screen));
 end
 
 if mouse
     phiM = 0; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
     E_d_M = 20; % cm, distance between eyes
     
-    L_CD_M = zeros(screenSize);
-    R_CD_M = zeros(screenSize);
+    L_CD_M = zeros(size(screen));
+    R_CD_M = zeros(size(screen));
     
-    L_I_M = zeros(screenSize);
-    R_I_M = zeros(screenSize);
+    L_I_M = zeros(size(screen));
+    R_I_M = zeros(size(screen));
     
-    sum_CD_M = zeros(screenSize);
-    sum_I_M = zeros(screenSize);
+    sum_CD_M = zeros(size(screen));
+    sum_I_M = zeros(size(screen));
 end
 
 %optics parameters:
@@ -217,14 +217,14 @@ Y = cellfun(fun,s);
 figure(1)
 hold on
 if treeShrew
-    surf(X,Y,sum_I_TS,[0,0,1])
+    surf(X,Y,sum_I_TS)
     %plot(screen,sumConeDensityTS)
 end
 if human
-    surf(X,Y,sum_I_TS)
+    plot(screen,sumConeDensityHuman)
 end
 if mouse
-    surf(X,Y,sum_I_TS)
+    plot(screen,sumConeDensityMouse)
 end
 xlabel('Horizontal Meridian (cm)')
 ylabel('Cone Density Combined Across Eyes')
