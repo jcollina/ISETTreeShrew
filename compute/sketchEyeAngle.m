@@ -29,15 +29,15 @@
 
 
 %choose size of screen
-screen = -10:.1:10;
+screen = -100:.1:100;
 
 D = 10; %cm distance from eyes to screen
 
 distanceFalloff = 1; %how much does information content fall off with distance to object
 
-human = 1;
+human = 0;
 treeShrew = 1;
-mouse = 1;
+mouse = 0;
 
 if human
     phiH = 0;
@@ -92,7 +92,7 @@ end
 
 %optics parameters:
 
-tsSigma = 3; %degrees... max cone density is 36k at center, but how long before it drops to 12k?
+tsSigma = 10; %degrees... max cone density is 36k at center, but how long before it drops to 12k?
 
 axialLengthHuman = 23; %mm
 axialLengthTS = 8; %mm
@@ -100,7 +100,7 @@ axialLengthMouse = 3.62; %mm
 
 
 totalHumanFOV = 120;
-totalTSFOV = 120;
+totalTSFOV = 1120;
 totalMouseFOV = 120;
 
 
@@ -215,7 +215,7 @@ end
 figure(1)
 hold on
 if treeShrew
-    plot(screen,sumConeDensityTS)
+    plot(screen,leftTSConeDensity)
 end
 if human
     plot(screen,sumConeDensityHuman)
