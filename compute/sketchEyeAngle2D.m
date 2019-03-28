@@ -14,14 +14,14 @@
 
 %need to figure out how information drops off with distance- obviously,
 %humans can change depth of focus, so dropoff isn't simple.
-
+     
 %currently have max FOV for all eyes being 120 total degrees (so 60 each
 %side)
 
 %NEXT STEP: bring in size of eyes: break up "visual field" into degrees-
 %it's not just about the density, but about the number of cones that the
-%eye has on that area.
-
+%eye has on that area.  
+          
 %surface area of sphere varies with radius as r^2, so for approx, just
 %multiply cone density by ((axial length)/2)
 
@@ -32,7 +32,7 @@
 
 human = 1;
 treeShrew = 1;
-mouse = 0;
+mouse = 1;
 
 compute = 0;
 
@@ -48,7 +48,7 @@ eyeInformationPlot = 1;
 
 screenSize = 1000/1000; %meters
 
-screenDistance = 100/1000; %meters distance from eyes to screen
+screenDistance = 500/1000; %meters distance from eyes to screen
 
 %optics parameters:
 
@@ -63,10 +63,10 @@ axialLengthTS = 8/1000;
 phiTS = 30;
 E_d_TS = 0/1000;
 totalTSFOV = 120;
-tsSigma = 30; %degrees... max cone density is 36k at center, but how long before it drops to 12k?
+tsSigma = 10; %degrees... max cone density is 36k at center, but how long before it drops to 12k?
 
 axialLengthM = 3.62/1000;
-phiM = 0;
+phiM = 30;
 E_d_M = 20/1000;
 totalMouseFOV = 120;
 
@@ -267,8 +267,12 @@ if(coneDensityPlot)
         plot3(0*X + dimMax, Y, Z,'g.-'); 
     end
     if mouse
-        surf(X,Y,log10(sum_CD_M),'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
+        Z = log10(sum_CD_M);
+        surf(X,Y,Z,'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
         hold on
+        %plot3(X, Y, 0*Z + dimMax,'b-');
+        plot3(X, 0*Y + dimMax, Z,'b.-');
+        plot3(0*X + dimMax, Y, Z,'b.-'); 
     end
     xlabel('Displacement from Horizontal Meridian (mm)')
     ylabel('Displacement from Vertical Meridian (mm)')
@@ -276,7 +280,7 @@ if(coneDensityPlot)
     %title(sprintf('Cone Density Due to Eye Angle \n D=%.0f cm, \\phi=%.0f degrees, E_d = %.0f cm', D,phi,E_dTS))
     hold off
     grid on
-    
+   
 end
 
 if eyeInformationPlot
@@ -290,17 +294,28 @@ if eyeInformationPlot
     figure(2)
     
     if human
-        surf(X,Y,log10(sum_I_H),'FaceColor','r', 'FaceAlpha',0.3, 'EdgeColor','none')
-        
+        Z = log10(sum_I_H);
+        surf(X,Y,Z,'FaceColor','r', 'FaceAlpha',0.3, 'EdgeColor','none')
         hold on
+        %plot3(X, Y, 0*Z + dimMax,'r-');
+        plot3(X, 0*Y + dimMax, Z,'r.-');
+        plot3(0*X + dimMax, Y, Z,'r.-'); 
     end
     if treeShrew
-        surf(X,Y,log10(sum_I_TS),'FaceColor','g', 'FaceAlpha',0.3, 'EdgeColor','none')
+        Z = log10(sum_I_TS);
+        surf(X,Y,Z,'FaceColor','g', 'FaceAlpha',0.3, 'EdgeColor','none')
         hold on
+        %plot3(X, Y, 0*Z + dimMax,'g-');
+        plot3(X, 0*Y + dimMax, Z,'g.-');
+        plot3(0*X + dimMax, Y, Z,'g.-'); 
     end
     if mouse
-        surf(X,Y,log10(sum_I_M),'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
+        Z = log10(sum_I_M);
+        surf(X,Y,Z,'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
         hold on
+        %plot3(X, Y, 0*Z + dimMax,'b-');
+        plot3(X, 0*Y + dimMax, Z,'b.-');
+        plot3(0*X + dimMax, Y, Z,'b.-'); 
     end
     xlabel('Displacement from Horizontal Meridian (mm)')
     ylabel('Displacement from Vertical Meridian (mm)')

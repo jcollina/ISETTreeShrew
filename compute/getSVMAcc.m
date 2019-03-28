@@ -1,9 +1,9 @@
-function [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum,psfSigma)
+function [percentCorrect,svmPrecision,time] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum,psfSigma)
 
 if ~exist('psfSigma','var')
      % default psfSigma = 7 microns
       psfSigma = 7;
- end
+end
 
 tic;
 
@@ -14,11 +14,8 @@ taskIntervals = 2;
 emPath = zeros(nTrialsNum, emPathLength, 2);
 
 % Generate wavefront-aberration derived ts optics
-theOI = oiTreeShrewCreate();
-
-
     theOI = oiTreeShrewCreate(...
-        'inFocusPSFsigmaMicrons', psfSigma ... % 40 microns
+        'inFocusPSFsigmaMicrons', psfSigma ...
     );
 
 % Compute the retinal image of the test stimulus
@@ -105,6 +102,7 @@ fractionCorrect = 1 - kfoldLoss(CVSVM,'lossfun','classiferror','mode','individua
 %
 % Average percent correct across all folds
 percentCorrect = mean(fractionCorrect) * 100;
+svmPrecision = std(percentCorrect);
 
 time = toc;
 

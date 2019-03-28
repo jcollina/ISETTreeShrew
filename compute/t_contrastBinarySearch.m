@@ -25,7 +25,7 @@ if compute == true
     %% Parameters
     %
     % How much data do you want to use to train the SVM?
-    nTrialsNum = 100;
+    nTrialsNum = 1000;
     
     % What discrete sptial frequencies do you want to find the sensitivities
     % for?
@@ -43,11 +43,11 @@ if compute == true
     % For the binary search, how many iterations do you want before stopping?
     % If you don't want to ever "give up" (only a good idea with a high
     % nTrialNum), set maxCycles very large.
-    maxCycles = 15;
+    maxCycles = 20;
     
     % How big do you want the stimulus, and therefore the mosaic, to be?
     % This will dramatically affect the time it takes to run the code.
-    sizeDegs = 1;
+    sizeDegs = 3;
     
     % Create cone mosaic of the appropriate size
     theMosaic = coneMosaicTreeShrewCreate(75, ...
