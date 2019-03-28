@@ -12,6 +12,9 @@
 %guesses about mouse- no fovea, and average of 12,000 cones/mm^2, so just
 %had that be the cone density everywhere that was in the field of vision
 
+%need to figure out how information drops off with distance- obviously,
+%humans can change depth of focus, so dropoff isn't simple.
+
 %currently have max FOV for all eyes being 120 total degrees (so 60 each
 %side)
 
@@ -27,49 +30,62 @@
 %have much bigger eyes, so even in those areas, there are more total cones
 %in the human eye for each segment of visual area.
 
-compute = 1;
-plotting = 1;
-
 human = 1;
+
 treeShrew = 1;
+
 mouse = 0;
 
-%choose size of screen
+compute = 0;
 
-screenSize = 100/1000; %meters
+% do I want:
+% just the plot of cone density for each spot on a screen
+coneDensityPlot = 1;
+
+%here, I take into account information falloff due to distance, and information
+%increase due to eye size
+eyeInformationPlot = 1;
+
+%choose size and distance of screen
+
+screenSize = 1000/1000; %meters
 
 screenDistance = 100/1000; %meters distance from eyes to screen
 
-distanceFalloff = 1; %how fast does information content fall off with distance to object?
-
-
 %optics parameters:
 
-tsSigma = 1; %degrees... max cone density is 36k at center, but how long before it drops to 12k?
+distanceFalloff = .25; %how fast does information content fall off with distance to object?
 
-axialLengthH = 23/1000; %m
-axialLengthTS = 8/1000; %m
-axialLengthM = 3.62/1000; %m
-
-
+axialLengthH = 23/1000; %meters
+phiH = 0; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
+E_d_H = 0/1000; % meters, distance between eyes
 totalHumanFOV = 120; %deg
+
+axialLengthTS = 8/1000;
+phiTS = 30;
+E_d_TS = 0/1000;
 totalTSFOV = 120;
+tsSigma = 30; %degrees... max cone density is 36k at center, but how long before it drops to 12k?
+
+axialLengthM = 3.62/1000;
+phiM = 0;
+E_d_M = 20/1000;
 totalMouseFOV = 120;
 
 
-maxEccTS = totalTSFOV/2;
-maxEccH = totalHumanFOV/2;
-maxEccM = totalMouseFOV/2;
-
 if compute
     
-    dimScreen = screenSize * 1000 + 1;
+    dimScreen = 101;%screenSize * 1000 + 1;
     
     D = screenDistance * 1000;
     
+    maxEccTS = totalTSFOV/2;
+    maxEccH = totalHumanFOV/2;
+    maxEccM = totalMouseFOV/2;
+    
+    maxP = normpdf(0,0,tsSigma);
+    
     if human
-        phiH = 0; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
-        E_d_H = 0/1000; % m, distance between eyes
         
         L_CD_H = zeros(dimScreen);
         R_CD_H = zeros(dimScreen);
@@ -82,8 +98,6 @@ if compute
     end
     
     if treeShrew
-        phiTS = 25; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
-        E_d_TS = 0/1000; % m, distance between eyes
         
         L_CD_TS = zeros(dimScreen);
         R_CD_TS = zeros(dimScreen);
@@ -96,8 +110,7 @@ if compute
     end
     
     if mouse
-        phiM = 0; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
-        E_d_M = 20/1000; % m, distance between eyes
+        
         
         L_CD_M = zeros(dimScreen);
         R_CD_M = zeros(dimScreen);
@@ -117,7 +130,7 @@ if compute
     for ii = 1:size(screenTemp,1)
         for jj = 1:size(screenTemp,2)
             c = [(jj-1)-(size(screenTemp,2)/2-0.5),(size(screenTemp,1)-ii)-(size(screenTemp,1)/2-0.5)];
-            screenTemp{ii,jj}=c/1000;
+            screenTemp{ii,jj} = (c/50) * screenSize/2;
         end
     end
     
@@ -131,27 +144,28 @@ if compute
             coords = screen{ii,jj};
             
             if treeShrew
-                
+
                 [dist,obsDist,ecc,angle] = getOpticsGeometry(coords,screenDistance,phiTS,E_d_TS);
                 angles(ii,jj) = angle(1);
                 eccs(ii,jj) = ecc(1);
+                
                 if abs(ecc(1)) > maxEccTS
-                    L_CD_TS = 0;
+                    L_CD_TS(ii,jj) = 0;
                 else
-                    L_CD_TS = normpdf(ecc(1),0,tsSigma)*(24000/.4)+12000;
+                    L_CD_TS(ii,jj) = normpdf(ecc(1),0,tsSigma)*(24000/maxP)+12000;
                 end
                 
-                L_I_TS(ii,jj) = L_CD_TS/(dist(1)^1);
+                L_I_TS(ii,jj) = L_CD_TS(ii,jj)/(dist(1)^distanceFalloff);
                 
                 if abs(ecc(2)) > maxEccTS
                     R_CD_TS = 0;
                 else
-                    R_CD_TS = normpdf(ecc(2),0,tsSigma)*(24000/.4)+12000;
+                    R_CD_TS = normpdf(ecc(2),0,tsSigma)*(24000/maxP)+12000;
                 end
                 
-                R_I_TS(ii,jj) = R_CD_TS/(dist(2)^1);
+                R_I_TS(ii,jj) = R_CD_TS/(dist(2)^distanceFalloff);
                 
-                sum_CD_TS(ii,jj) = L_CD_TS + R_CD_TS;
+                sum_CD_TS(ii,jj) = L_CD_TS(ii,jj) + R_CD_TS;
                 
                 sum_I_TS(ii,jj) = (L_I_TS(ii,jj) + R_I_TS(ii,jj))*(axialLengthTS/2)^2;
             end
@@ -177,7 +191,7 @@ if compute
                 
                 ls(ii,jj)=L_CD_H;
                 dists(ii,jj)=dist(1);
-                L_I_H(ii,jj) = L_CD_H/(dist(1)^1);
+                L_I_H(ii,jj) = L_CD_H/(dist(1)^distanceFalloff);
                 
                 if abs(ecc(2)) > maxEccH
                     R_CD_H = 0;
@@ -188,7 +202,7 @@ if compute
                     end
                 end
                 
-                R_I_H(ii,jj) = R_CD_H/(dist(2)^1);
+                R_I_H(ii,jj) = R_CD_H/(dist(2)^distanceFalloff);
                 
                 sum_CD_H(ii,jj) = L_CD_H + R_CD_H;
                 
@@ -207,7 +221,7 @@ if compute
                     L_CD_M = 12000;%normpdf(ecc(1),0,tsSigma)*(24000/.4)+12000;
                 end
                 
-                L_I_M(ii,jj) = L_CD_M/(dist(1)^1);
+                L_I_M(ii,jj) = L_CD_M/(dist(1)^distanceFalloff);
                 
                 if abs(ecc(2)) > maxEccM
                     R_CD_M = 0;
@@ -215,7 +229,7 @@ if compute
                     R_CD_M = 12000;%normpdf(ecc(2),0,tsSigma)*(24000/.4)+12000;
                 end
                 
-                R_I_M(ii,jj) = R_CD_M/(dist(2)^1);
+                R_I_M(ii,jj) = R_CD_M/(dist(2)^distanceFalloff);
                 
                 sum_CD_M(ii,jj) = L_CD_M + R_CD_M;
                 
@@ -225,7 +239,7 @@ if compute
     end
 end
 
-if(plotting)
+if(coneDensityPlot)
     
     %hold on
     s = screen; %to get in mm for plotting
@@ -234,23 +248,28 @@ if(plotting)
     fun = @(x) 1000 * x(2);
     Y = cellfun(fun,s);
     
+    dimMax = max(X(:));
+    
     figure(1)
     
     if human
-        c = getColMat(dimScreen,[0,1,0]);
-        surf(X,Y,log10(sum_CD_H),'FaceColor','g', 'FaceAlpha',0.3, 'EdgeColor','none')
+        Z = log10(sum_CD_H);
+        surf(X,Y,Z,'FaceColor','r', 'FaceAlpha',0.3, 'EdgeColor','none')
         hold on
+        %plot3(X, Y, 0*Z + dimMax,'r-');
+        plot3(X, 0*Y + dimMax, Z,'r.-');
+        plot3(0*X + dimMax, Y, Z,'r.-'); 
     end
-    
     if treeShrew
-        c = getColMat(dimScreen,[1,0,0]);
-        surf(X,Y,log10(sum_CD_TS),'FaceColor','r', 'FaceAlpha',0.3)%, 'EdgeColor','none')
+        Z = log10(sum_CD_TS);
+        surf(X,Y,Z,'FaceColor','g', 'FaceAlpha',0.3, 'EdgeColor','none')
         hold on
+        %plot3(X, Y, 0*Z + dimMax,'g-');
+        plot3(X, 0*Y + dimMax, Z,'g.-');
+        plot3(0*X + dimMax, Y, Z,'g.-'); 
     end
-    
     if mouse
-        c = getColMat(dimScreen,[0,0,1]);
-        surf(X,Y,sum_I_M,'FaceColor','b', 'FaceAlpha',0.3)%, 'EdgeColor','none')
+        surf(X,Y,log10(sum_CD_M),'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
         hold on
     end
     xlabel('Displacement from Horizontal Meridian (mm)')
@@ -262,12 +281,67 @@ if(plotting)
     
 end
 
-function c = getColMat(screenSize,rgb)
+if eyeInformationPlot
+    
+    s = screen; %to get in mm for plotting
+    fun = @(x) 1000 * x(1);
+    X = cellfun(fun,s);
+    fun = @(x) 1000 * x(2);
+    Y = cellfun(fun,s);
+    
+    figure(2)
+    
+    if human
+        surf(X,Y,log10(sum_I_H),'FaceColor','r', 'FaceAlpha',0.3, 'EdgeColor','none')
+        
+        hold on
+    end
+    if treeShrew
+        surf(X,Y,log10(sum_I_TS),'FaceColor','g', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+    end
+    if mouse
+        surf(X,Y,log10(sum_I_M),'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+    end
+    xlabel('Displacement from Horizontal Meridian (mm)')
+    ylabel('Displacement from Vertical Meridian (mm)')
+    zlabel('log_{10} Information (~Cones)')
+    %title(sprintf('Cone Density Due to Eye Angle \n D=%.0f cm, \\phi=%.0f degrees, E_d = %.0f cm', D,phi,E_dTS))
+    hold off
+    grid on
+end
 
+%% Functions
+
+function [distance,observedDistance,eccentricity,angle] = getOpticsGeometry(coords,D,phi,E_d)
+ScreenZ = coords(2);
+screenPosVector = [coords(1) 0 coords(2)];
+b = [-1 1]; % left, right
+for i = 1:length(b)
+    side = b(i);
+    eyePosVector = [side * E_d/2 D 0];
+    screenX = screenPosVector(1)-eyePosVector(1);
+    observedScreenX = screenX - side * D * tand(phi);
+    observedScreenPosVector = [observedScreenX 0 coords(2)];
+    if observedScreenX >= 0
+        angle(i) = atand(ScreenZ/(observedScreenX));
+    else
+        angle(i) = 180+atand(ScreenZ/observedScreenX);
+    end
+    if isnan(angle(i))
+        angle(i) = 1e-4;
+    end
+    distance(i) = sqrt(sum((eyePosVector - screenPosVector).^2));
+    observedDistance(i) = sqrt(sum((eyePosVector - observedScreenPosVector).^2));
+    eccentricity(i) = atand((sqrt(observedScreenX^2+ScreenZ^2))/distance(i));
+end
+end
+
+function c = getColMat(screenSize,rgb)
 if(prod(rgb)>1)
     rgb = rgb./255;
 end
-
 c = zeros(screenSize,screenSize,3);
 c(:,:,1) = rgb(1);
 c(:,:,2) = rgb(2);

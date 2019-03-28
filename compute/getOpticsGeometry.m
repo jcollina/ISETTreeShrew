@@ -1,5 +1,4 @@
 function [distance,observedDistance,eccentricity,angle] = getOpticsGeometry(coords,D,phi,E_d)
-%%
 
 ScreenZ = coords(2);
 
