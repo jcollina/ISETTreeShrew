@@ -1,5 +1,6 @@
 %% t_eyeGeometry
-% Illustrate basic principles of how eye parameters affect isomerizations.
+% Illustrate effect of various geometric properties of the eye on
+% information obtained from an image
 %
 % Description:
 %    Demonstrate how changing the focal length, the pupil diameter 
@@ -11,184 +12,335 @@
 %
 
 % History:
-%   02/01/19 jsc  Wrote initial version.
-%   02/08/19 jsc, dhb Documentation formatting etc.
+%   03/26/19 jsc  Wrote initial version.
 
-%% Initialize workspace and close old figures
-clear; close all;
-ieInit;
+human = 1;
+treeShrew = 1;
+mouse = 1;
 
-%% Parameters
-%
-% How many data points to compute and plot
-nPointsToCompute = 5;
+compute = 0;
 
-% Base eye parameters.  These are reasonable starting points for a tree
-% shrew eye.
-baseFocalLengthMM = 4.35;
-basePupilDiameterMM = 2.0;
-baseInnerSegmentDiameterUM = 7.0;
+% do I want:
+% just the plot of cone density for each spot on a screen
+coneDensityPlot = 1;
 
-% Level of change of varied parameter.  This also gets scaled
-% by sqrt of integer change before being added to the base. 
-% Numerical choices are not fundamental, just to give us a reasonable
-% range.
-deltaFocalLengthMM = 2.0;
-deltaPupilDiameterMM = 1.0;
-deltaInnerSegmentDiameterUM = 3.0;
+%here, I take into account information falloff due to distance, and information
+%increase due to eye size
+eyeInformationPlot = 1;
 
-% Specify which eye parameter we'll study in this run. The way this works
-% is that the vector specifise which of the parameters will be incremented
-% in the main loop below, where we recompute isomerizations across eye
-% parameter variation.
-%   [1,0,0] - Vary focal length
-%   [0,1,0] - Vary pupil diameter
-%   [0,0,1] - Vary inner segment diameter
-v = [1,0,0];
-v = [0,0,1];
+%choose size and distance of screen
 
-% Specify cone densities similar to Peichl 1989 and set up a mosaic. Tree
-% shrew mosaic dominated by L cones, so  we'll approximate with only L cones.
-% For historical reasons, ISETBio parameters cone types in a vector
-% "black", L, M and S. Tree shrews have no M cones. 
-%
-% Variable whichConeType determines which cone type we'll use
-% to estimate isomerizations.  2 -> L, 3 -> M 4 -> S.  It would
-% be a bad idea to use M, since we specify a mosaic with no M cones.
-spatialLMSdensities = [0 1 0 0];
-whichConeType = 2;
+screenSize = 1000/1000; %meters
 
-% Size of mosaic in degrees.
-fovDegs = 0.4*[1 1];
+screenDistance = 500/1000; %meters distance from eyes to screen
 
-%% Initialize variables
-meanRetinalIlluminance = zeros(1,nPointsToCompute);
-tMosaicExcitationMean = zeros(1,nPointsToCompute);
-eyeParameterValue = zeros(1,nPointsToCompute);
+%optics parameters:
 
-% Analytic relative sensitivity as specified from the treatment in Animal
-% Eyes. Basically, isomerizaiton rate should go up with the square of pupil
-% diameter, up with the square of inner segment diameter, and down with the
-% square of the focal length. These are the relations we are going to
-% verify here.
-s_AnimalEyes = zeros(1,nPointsToCompute);
+distanceFalloff = .25; %how fast does information content fall off with distance to object?
 
-%% Create a scene
-%
-% This one emits equal photon rates at all wavelengths
-testScene = sceneCreate('uniformEqualPhoton');
+axialLengthH = 23/1000; %meters
+phiH = 0; %degrees eye is rotated (0 degrees: fovea pointed at screen, 90 degrees: fovea pointed adjacent)
+E_d_H = 0/1000; % meters, distance between eyes
+totalHumanFOV = 120; %deg
 
-%% Main loop.
-%
-% Compute isomerizations across parameter variation and save up the results
-% for plotting.
-for n = 1:nPointsToCompute
-    % Get a vector that lets us decide the size of each of the parameters.  This
-    % starts with v and increments on each loop iteration.
-    vector = [n-1,n-1,n-1].*v;
+axialLengthTS = 8/1000;
+phiTS = 30;
+E_d_TS = 0/1000;
+totalTSFOV = 120;
+tsSigma = 10; %degrees... max cone density is 36k at center, but how long before it drops to 12k?
+
+axialLengthM = 3.62/1000;
+phiM = 30;
+E_d_M = 20/1000;
+totalMouseFOV = 120;
+
+
+if compute
     
-    % Set up parameters for this itereation. We vary delta according to
-    % sqrt of iteration for each parameter, just because we like the way
-    % plots look when we do that.
-    focalLengthMM = baseFocalLengthMM + sqrt(vector(1)) * deltaFocalLengthMM;
-    pupilDiameterMM = basePupilDiameterMM + sqrt(vector(2)) * deltaPupilDiameterMM;
-    innerSegmentDiameterUM = baseInnerSegmentDiameterUM + sqrt(vector(3)) * deltaInnerSegmentDiameterUM;
+    dimScreen = 101;%screenSize * 1000 + 1;
     
-    % This switch statement sets up information for plotting, which depends
-    % on which eye parameter we are varying. We also store the value of the
-    % parameter for each interation, to be used in labeling individual
-    % points in the plot.
-    switch find(v)
-        case 1
-            eyeParameterValue(n) = focalLengthMM;
-            parameterName = 'Focal Length'; 
-            shortParameterName = 'F'; 
-            parameterUnits = 'mm';
-        case 2
-            eyeParameterValue(n) = pupilDiameterMM;
-            parameterName = 'Pupil Diameter';
-            shortParameterName = 'P_D';
-            parameterUnits = 'mm';
-        case 3
-            eyeParameterValue(n) = innerSegmentDiameterUM;
-            parameterName = 'Inner Segment Aperture Diameter';
-            shortParameterName = 'IS_D';
-            parameterUnits = 'um';
+    D = screenDistance * 1000;
+    
+    maxEccTS = totalTSFOV/2;
+    maxEccH = totalHumanFOV/2;
+    maxEccM = totalMouseFOV/2;
+    
+    maxP = normpdf(0,0,tsSigma);
+    
+    if human
+        
+        L_CD_H = zeros(dimScreen);
+        R_CD_H = zeros(dimScreen);
+        
+        L_I_H = zeros(dimScreen);
+        R_I_H = zeros(dimScreen);
+        
+        sum_CD_H = zeros(dimScreen);
+        sum_I_H = zeros(dimScreen);
     end
     
-    % Create optical image object for current parameters.
-    tOI = oiTreeShrewCreate('pupilDiameterMM', pupilDiameterMM, 'focalLengthMM', ...
-        focalLengthMM);
+    if treeShrew
+        
+        L_CD_TS = zeros(dimScreen);
+        R_CD_TS = zeros(dimScreen);
+        
+        L_I_TS = zeros(dimScreen);
+        R_I_TS = zeros(dimScreen);
+        
+        sum_CD_TS = zeros(dimScreen);
+        sum_I_TS = zeros(dimScreen);
+    end
     
-    % Create the mosaic
-    tMosaic = coneMosaicTreeShrewCreate(tOI.optics.micronsPerDegree, ...
-        'spatialDensity', spatialLMSdensities, ...
-        'customInnerSegmentDiameter', innerSegmentDiameterUM, ...
-        'integrationTime', 5/1000, ...
-        'fovDegs', fovDegs);
+    if mouse
+        
+        
+        L_CD_M = zeros(dimScreen);
+        R_CD_M = zeros(dimScreen);
+        
+        L_I_M = zeros(dimScreen);
+        R_I_M = zeros(dimScreen);
+        
+        sum_CD_M = zeros(dimScreen);
+        sum_I_M = zeros(dimScreen);
+    end
     
-    % Compute the retinal image
-    tOI = oiCompute(tOI, testScene);
     
-    % Get and store the retinal irradiance
-    meanRetinalIlluminance(n) = oiGet(tOI, 'mean illuminance');
+    %
     
-    % Compute the mosaic responses (for more replicable responses, use more trials)
-    nTrialsNum = 1;
-    emPath = zeros(nTrialsNum, 1, 2);
+    screenTemp = cell(dimScreen);
     
-    % Compute *treeshrew* mosaic excitation responses to treeshrew optical image
-    tMosaicExcitation = tMosaic.compute(tOI, 'emPath', emPath);
+    for ii = 1:size(screenTemp,1)
+        for jj = 1:size(screenTemp,2)
+            c = [(jj-1)-(size(screenTemp,2)/2-0.5),(size(screenTemp,1)-ii)-(size(screenTemp,1)/2-0.5)];
+            screenTemp{ii,jj} = (c/50) * screenSize/2;
+        end
+    end
     
-    % Find mean excitations
-    tMosaicExcitationMean(n) = ...
-        meanResponseToOpticalImage(tMosaic, tMosaicExcitation, whichConeType);
+    screen = screenTemp;
     
-    % Calculate estimated sensitivity according to Animal Eyes
-    s_AnimalEyes(n) = 0.62 * (pupilDiameterMM^2 * innerSegmentDiameterUM^2)/ ...
-        (focalLengthMM^2);
-    
+    %
+    for ii = 1:size(screen,1) % x
+        for jj = 1:size(screen,1) % z
+            
+            %%
+            coords = screen{ii,jj};
+            
+            if treeShrew
+
+                [dist,obsDist,ecc,angle] = getOpticsGeometry(coords,screenDistance,phiTS,E_d_TS);
+                angles(ii,jj) = angle(1);
+                eccs(ii,jj) = ecc(1);
+                
+                if abs(ecc(1)) > maxEccTS
+                    L_CD_TS(ii,jj) = 0;
+                else
+                    L_CD_TS(ii,jj) = normpdf(ecc(1),0,tsSigma)*(24000/maxP)+12000;
+                end
+                
+                L_I_TS(ii,jj) = L_CD_TS(ii,jj)/(dist(1)^distanceFalloff);
+                
+                if abs(ecc(2)) > maxEccTS
+                    R_CD_TS = 0;
+                else
+                    R_CD_TS = normpdf(ecc(2),0,tsSigma)*(24000/maxP)+12000;
+                end
+                
+                R_I_TS(ii,jj) = R_CD_TS/(dist(2)^distanceFalloff);
+                
+                sum_CD_TS(ii,jj) = L_CD_TS(ii,jj) + R_CD_TS;
+                
+                sum_I_TS(ii,jj) = (L_I_TS(ii,jj) + R_I_TS(ii,jj))*(axialLengthTS/2)^2;
+            end
+            
+            
+            
+            %end
+            
+            if human
+                %human
+                
+                [dist,obsDist,ecc,angle] = getOpticsGeometry(coords,screenDistance,phiH,E_d_H);
+                angles(ii,jj) = angle(1);
+                eccs(ii,jj) = ecc(1);
+                if abs(ecc(1)) > maxEccH
+                    L_CD_H = 0;
+                else
+                    L_CD_H = coneDensityReadData('eccentricity', abs(ecc(1))*(3/1000),'angle',angle(1), 'whichEye', 'left');
+                    if(isnan(L_CD_H))
+                        L_CD_H = 4.8145e+03; %would love a better way of doing this- maybe read in all data first, then get lowest, and then us that?
+                    end
+                end
+                
+                ls(ii,jj)=L_CD_H;
+                dists(ii,jj)=dist(1);
+                L_I_H(ii,jj) = L_CD_H/(dist(1)^distanceFalloff);
+                
+                if abs(ecc(2)) > maxEccH
+                    R_CD_H = 0;
+                else
+                    R_CD_H = coneDensityReadData('eccentricity', abs(ecc(2))*(3/1000),'angle',angle(2), 'whichEye', 'right');
+                    if(isnan(R_CD_H))
+                        R_CD_H = 3.2540e+03;
+                    end
+                end
+                
+                R_I_H(ii,jj) = R_CD_H/(dist(2)^distanceFalloff);
+                
+                sum_CD_H(ii,jj) = L_CD_H + R_CD_H;
+                
+                sum_I_H(ii,jj) = (L_I_H(ii,jj) + R_I_H(ii,jj))*(axialLengthH/2)^2;
+                
+            end
+            
+            
+            if mouse
+                
+                [dist,obsDist,ecc,angle] = getOpticsGeometry(coords,screenDistance,phiM,E_d_M);
+                
+                if abs(ecc(1)) > maxEccM
+                    L_CD_M = 0;
+                else
+                    L_CD_M = 12000;%normpdf(ecc(1),0,tsSigma)*(24000/.4)+12000;
+                end
+                
+                L_I_M(ii,jj) = L_CD_M/(dist(1)^distanceFalloff);
+                
+                if abs(ecc(2)) > maxEccM
+                    R_CD_M = 0;
+                else
+                    R_CD_M = 12000;%normpdf(ecc(2),0,tsSigma)*(24000/.4)+12000;
+                end
+                
+                R_I_M(ii,jj) = R_CD_M/(dist(2)^distanceFalloff);
+                
+                sum_CD_M(ii,jj) = L_CD_M + R_CD_M;
+                
+                sum_I_M(ii,jj) = (L_I_M(ii,jj) + R_I_M(ii,jj))*(axialLengthM/2)^2;
+            end
+        end
+    end
 end
-%ISETBio's average cone excitation for a given image is conceptually the
-%same as the "eye sensitivity" given in Animal Eyes
-s_Iset = tMosaicExcitationMean;
-%% Plotting
 
-x = s_AnimalEyes;
-y = s_Iset;
-ft = fitlm(x,y);
-
-plot(x,y,'o')
-plot(ft)
-xlabel('Sensitivity (Animal Eyes)')
-ylabel('Sensitivty (ISETBio)')
-xlim([0,inf])
-ylim([0,inf])
-
-title([{'Relationship Between ISETBIO and Animal Eyes Sensitivity'}, ...
-    {sprintf('As %s Changes',parameterName)}])
-
-labels = cell(1,nPointsToCompute);
-for i=1:nPointsToCompute
-labels(i) = cellstr(sprintf('%s= %.2f %s', shortParameterName, eyeParameterValue(i), parameterUnits));
+if(coneDensityPlot)
+    
+    %hold on
+    s = screen; %to get in mm for plotting
+    fun = @(x) 1000 * x(1);
+    X = cellfun(fun,s);
+    fun = @(x) 1000 * x(2);
+    Y = cellfun(fun,s);
+    
+    dimMax = max(X(:));
+    
+    figure(1)
+    
+    if human
+        Z = log10(sum_CD_H);
+        surf(X,Y,Z,'FaceColor','r', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+        %plot3(X, Y, 0*Z + dimMax,'r-');
+        plot3(X, 0*Y + dimMax, Z,'r.-');
+        plot3(0*X + dimMax, Y, Z,'r.-'); 
+    end
+    if treeShrew
+        Z = log10(sum_CD_TS);
+        surf(X,Y,Z,'FaceColor','g', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+        %plot3(X, Y, 0*Z + dimMax,'g-');
+        plot3(X, 0*Y + dimMax, Z,'g.-');
+        plot3(0*X + dimMax, Y, Z,'g.-'); 
+    end
+    if mouse
+        Z = log10(sum_CD_M);
+        surf(X,Y,Z,'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+        %plot3(X, Y, 0*Z + dimMax,'b-');
+        plot3(X, 0*Y + dimMax, Z,'b.-');
+        plot3(0*X + dimMax, Y, Z,'b.-'); 
+    end
+    xlabel('Displacement from Horizontal Meridian (mm)')
+    ylabel('Displacement from Vertical Meridian (mm)')
+    zlabel('log_{10} Cone Density (cones/mm^2)')
+    %title(sprintf('Cone Density Due to Eye Angle \n D=%.0f cm, \\phi=%.0f degrees, E_d = %.0f cm', D,phi,E_dTS))
+    hold off
+    grid on
+   
 end
 
-text(x,y,labels,'VerticalAlignment','top','HorizontalAlignment','right')
-
-I1 = meanRetinalIlluminance./meanRetinalIlluminance(1); %illuminance for each level
-
-E1 = tMosaicExcitationMean./tMosaicExcitationMean(1); %efficiency for each cone (LMS) for each level
-
-S1 = s_Iset./s_Iset(1);
-
-
+if eyeInformationPlot
+    
+    s = screen; %to get in mm for plotting
+    fun = @(x) 1000 * x(1);
+    X = cellfun(fun,s);
+    fun = @(x) 1000 * x(2);
+    Y = cellfun(fun,s);
+    
+    figure(2)
+    
+    if human
+        Z = log10(sum_I_H);
+        surf(X,Y,Z,'FaceColor','r', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+        %plot3(X, Y, 0*Z + dimMax,'r-');
+        plot3(X, 0*Y + dimMax, Z,'r.-');
+        plot3(0*X + dimMax, Y, Z,'r.-'); 
+    end
+    if treeShrew
+        Z = log10(sum_I_TS);
+        surf(X,Y,Z,'FaceColor','g', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+        %plot3(X, Y, 0*Z + dimMax,'g-');
+        plot3(X, 0*Y + dimMax, Z,'g.-');
+        plot3(0*X + dimMax, Y, Z,'g.-'); 
+    end
+    if mouse
+        Z = log10(sum_I_M);
+        surf(X,Y,Z,'FaceColor','b', 'FaceAlpha',0.3, 'EdgeColor','none')
+        hold on
+        %plot3(X, Y, 0*Z + dimMax,'b-');
+        plot3(X, 0*Y + dimMax, Z,'b.-');
+        plot3(0*X + dimMax, Y, Z,'b.-'); 
+    end
+    xlabel('Displacement from Horizontal Meridian (mm)')
+    ylabel('Displacement from Vertical Meridian (mm)')
+    zlabel('log_{10} Information (~Cones)')
+    %title(sprintf('Cone Density Due to Eye Angle \n D=%.0f cm, \\phi=%.0f degrees, E_d = %.0f cm', D,phi,E_dTS))
+    hold off
+    grid on
+end
 
 %% Functions
 
-function meanResponse = meanResponseToOpticalImage(coneMosaic, coneMosaicResponse, ...
-    targetConeType)
-nTrialsNum = size(coneMosaicResponse,1);
-coneMosaicResponse  = reshape(coneMosaicResponse, [nTrialsNum numel(coneMosaic.pattern)]);
-idx = find(coneMosaic.pattern == targetConeType);
-meanResponse = mean(mean(coneMosaicResponse(:,idx)));
+function [distance,observedDistance,eccentricity,angle] = getOpticsGeometry(coords,D,phi,E_d)
+ScreenZ = coords(2);
+screenPosVector = [coords(1) 0 coords(2)];
+b = [-1 1]; % left, right
+for i = 1:length(b)
+    side = b(i);
+    eyePosVector = [side * E_d/2 D 0];
+    screenX = screenPosVector(1)-eyePosVector(1);
+    observedScreenX = screenX - side * D * tand(phi);
+    observedScreenPosVector = [observedScreenX 0 coords(2)];
+    if observedScreenX >= 0
+        angle(i) = atand(ScreenZ/(observedScreenX));
+    else
+        angle(i) = 180+atand(ScreenZ/observedScreenX);
+    end
+    if isnan(angle(i))
+        angle(i) = 1e-4;
+    end
+    distance(i) = sqrt(sum((eyePosVector - screenPosVector).^2));
+    observedDistance(i) = sqrt(sum((eyePosVector - observedScreenPosVector).^2));
+    eccentricity(i) = atand((sqrt(observedScreenX^2+ScreenZ^2))/distance(i));
+end
+end
+
+function c = getColMat(screenSize,rgb)
+if(prod(rgb)>1)
+    rgb = rgb./255;
+end
+c = zeros(screenSize,screenSize,3);
+c(:,:,1) = rgb(1);
+c(:,:,2) = rgb(2);
+c(:,:,3) = rgb(3);
 end
