@@ -16,11 +16,16 @@ ieInit;
 
 %% What do you want to do?
 %
-compute = true;
+compute = 1;
 
-psychFn = false;
+% If compute == 0, and you
+dataToLoad = 'dataTotal1000_.75-1.25_psf_15.mat';
 
-if compute == true
+toDivide = 12;
+
+psychFn = 0;
+
+if compute
     
     %% Parameters
     %
@@ -29,7 +34,7 @@ if compute == true
     
     % What discrete sptial frequencies do you want to find the sensitivities
     % for?
-    frequencyRange = 0.75;%:0.25:1.25;
+    frequencyRange = 0.75:0.25:2;
     
     % What range of contrasts do you want to explore for the spatial
     % frequencies? Make it wide enough to include accuracies other than 100%
@@ -48,12 +53,13 @@ if compute == true
     % How big do you want the stimulus, and therefore the mosaic, to be?
     % This will dramatically affect the time it takes to run the code.
     sizeDegs = 3;
-    
+
     % Create cone mosaic of the appropriate size
     theMosaic = coneMosaicTreeShrewCreate(75, ...
         'fovDegs', sizeDegs, ...
         'integrationTimeSeconds', 10/1000);
     
+%%
     %% Initialize Variables
     %
     % Initialize cell array to store psychometric function data
@@ -99,8 +105,8 @@ if compute == true
         % initialize parameters for binary search
         maxContrast = max(contrastRange);
         minContrast = min(contrastRange);
-        contrasts = [];
-        accuracies = [];
+        contrasts = NaN(1,maxCycles);
+        accuracies = NaN(1,MaxCycles);
         cycle = 0;
         
         % Start search
@@ -122,8 +128,8 @@ if compute == true
             [acc,t] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum);
             
             % Save variables
-            contrasts = [contrasts, currentContrast];
-            accuracies = [accuracies, acc];
+            contrasts(cycle+1) = [contrasts, currentContrast];
+            accuracies(cycle+1) = [accuracies, acc];
             
             % Determine parameters for next cycle of search
             if acc < min(desiredAccRange)
@@ -152,15 +158,15 @@ if compute == true
         end
         
         % Save variables
-        contrastsTotal{1,i} = contrasts;
-        accuraciesTotal{1,i} = accuracies;
+        contrastsTotal{1,i} = rmmissing(contrasts);
+        accuraciesTotal{1,i} = rmmissing(accuracies);
         thresholdContrasts(1,i) = thresholdContrast;
     end
     time = toc(T);
-    save('dataTotal','theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','frequencyRange','nTrialsNum','time')    
+    save('compute/dataTotal','theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','frequencyRange','nTrialsNum','time','sizeDegs')    
 else    
-    load('dataTotal1000')
-    sizeDegs = 1;
+    load(dataToLoad)
+    frequencyRange = [.75 1 1.25]
 end
 
 %% Plot data
@@ -182,20 +188,29 @@ xlabel('\it Contrast (Michelson)');
 ylabel('\it SVM Accuracy');
 title('Psychometric Function Approximations')
 
+sensitivity = 1./thresholdContrasts;
+
 % Visualize relationship between spatial frequency and sensitivity (CSF)
 figure(2)
-plot(frequencyRange,1./thresholdContrasts,'k.-','MarkerSize',20)
-
+frequencyRange
+load compute/ts_CSF_M.mat
+frequencyRange
+plot( frequencyRange , sensitivity/toDivide,'b.-','MarkerSize',20)
+hold on
+plot(ts1(:,1),ts1(:,2),'k.-')
+plot(ts2(:,1),ts2(:,2),'kx-')
+plot(ts3(:,1),ts3(:,2),'ko-')
 %set(gcf, 'color', 'none');
 %set(gca, 'color', 'none');
 
-set(gca,'xlim',[.1,max(frequencyRange)])
-set(gca,'ylim',[0,max(1./thresholdContrasts)])
+set(gca,'ylim',[0,max(sensitivity)])
 
 if max(frequencyRange) > 2
+    set(gca,'xlim',[.1,max(frequencyRange)])
     contrastTicks = [0.1 0.2 0.5 1.0 2.0, max(frequencyRange) ];
     contrastTickLabels = {'.1', '.2', '.5', '1', '2', sprintf('%.0f',max(frequencyRange))};
 else
+    set(gca,'xlim',[.1,2])
     contrastTicks = [0.1 0.2 0.5 1.0 2.0 ];
     contrastTickLabels = {'.1', '.2', '.5', '1', '2'};
 end
@@ -210,7 +225,7 @@ title(sprintf('CSF, n = %.2f',nTrialsNum))
 
 %%
 
-if psychFn == true
+if psychFn
     %
     % %at this point, we have a psychometric function of accuracy as a function
     % %of contrast that should sample the threshold well
