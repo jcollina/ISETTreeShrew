@@ -16,12 +16,12 @@ ieInit;
 
 %% What do you want to do?
 %
-compute = 1;
+compute = 0;
 
 % If compute == 0, and you
-dataToLoad = 'dataTotal1000_.75-1.25_psf_15.mat';
+dataToLoad = 'dataTotal.mat';%1000_.75-1.25_psf_15.mat';
 
-toDivide = 12;
+toDivide = 35;
 
 psychFn = 0;
 
@@ -106,7 +106,7 @@ if compute
         maxContrast = max(contrastRange);
         minContrast = min(contrastRange);
         contrasts = NaN(1,maxCycles);
-        accuracies = NaN(1,MaxCycles);
+        accuracies = NaN(1,maxCycles);
         cycle = 0;
         
         % Start search
@@ -128,8 +128,8 @@ if compute
             [acc,t] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum);
             
             % Save variables
-            contrasts(cycle+1) = [contrasts, currentContrast];
-            accuracies(cycle+1) = [accuracies, acc];
+            contrasts(cycle+1) = currentContrast;
+            accuracies(cycle+1) = acc;
             
             % Determine parameters for next cycle of search
             if acc < min(desiredAccRange)
@@ -163,10 +163,9 @@ if compute
         thresholdContrasts(1,i) = thresholdContrast;
     end
     time = toc(T);
-    save('compute/dataTotal','theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','frequencyRange','nTrialsNum','time','sizeDegs')    
+    save('dataTotal','theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','frequencyRange','nTrialsNum','time','sizeDegs')    
 else    
     load(dataToLoad)
-    frequencyRange = [.75 1 1.25]
 end
 
 %% Plot data
@@ -192,9 +191,13 @@ sensitivity = 1./thresholdContrasts;
 
 % Visualize relationship between spatial frequency and sensitivity (CSF)
 figure(2)
-frequencyRange
+
 load compute/ts_CSF_M.mat
-frequencyRange
+
+ts1 = ts_CSF_M{1};
+ts2 = ts_CSF_M{2};
+ts3 = ts_CSF_M{3};
+
 plot( frequencyRange , sensitivity/toDivide,'b.-','MarkerSize',20)
 hold on
 plot(ts1(:,1),ts1(:,2),'k.-')

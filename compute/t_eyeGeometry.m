@@ -2,11 +2,7 @@
 % Illustrate effect of various geometric properties of the eye on
 % information obtained from an image
 %
-% Description:
-%    Demonstrate how changing the focal length, the pupil diameter 
-%    and the inner segment aperture affect photoreceptor isomerization rate
-%    computed by ISETBio, and compare this with the analytical analysis presented
-%    Animal Eyes (ADD BIBLIGRAPHIC INFO), pages XX ff.
+
 %
 % See also:
 %
@@ -18,7 +14,7 @@ human = 1;
 treeShrew = 1;
 mouse = 1;
 
-compute = 0;
+compute = 1;
 
 % do I want:
 % just the plot of cone density for each spot on a screen
