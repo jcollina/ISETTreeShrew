@@ -11,17 +11,18 @@
 %   03/14/19 jsc  Wrote initial version.
 
 %% Initialize workspace and close old figures
-clear; close all;
+%clear; close all;
 ieInit;
 
 %% What do you want to do?
 %
-compute = 0;
+compute = 1;
 
-% If compute == 0, and you
-dataToLoad = 'dataTotal.mat';%1000_.75-1.25_psf_15.mat';
+toDivide = 20;
 
-toDivide = 35;
+psfSigma = 12;
+
+dataToLoad = 'dataTotal1000_.75-1.25_psf_15.mat';
 
 psychFn = 0;
 
@@ -34,7 +35,7 @@ if compute
     
     % What discrete sptial frequencies do you want to find the sensitivities
     % for?
-    frequencyRange = 0.75:0.25:2;
+    frequencyRange = 0.75:0.25:2.5;
     
     % What range of contrasts do you want to explore for the spatial
     % frequencies? Make it wide enough to include accuracies other than 100%
@@ -48,7 +49,7 @@ if compute
     % For the binary search, how many iterations do you want before stopping?
     % If you don't want to ever "give up" (only a good idea with a high
     % nTrialNum), set maxCycles very large.
-    maxCycles = 20;
+    maxCycles = 20;   
     
     % How big do you want the stimulus, and therefore the mosaic, to be?
     % This will dramatically affect the time it takes to run the code.
@@ -125,7 +126,7 @@ if compute
             
             % Use a binary SVM to get a measure of accuracy in terms of determining
             % which stimulus had gratings
-            [acc,t] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum);
+            [acc,prec,t] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum,psfSigma);
             
             % Save variables
             contrasts(cycle+1) = currentContrast;
@@ -142,18 +143,29 @@ if compute
                 % if reached desired range
                 thresholdContrast = currentContrast;
                 finalAcc = acc;
+                finalPrec = prec;
                 disp('next :)')
                 break;
             end
             
-            % Allow for exit due to reaching maximum number of cycles
+            % Allow for restart due to reaching maximum number of cycles
             if cycle > maxCycles
-                thresholdContrast = currentContrast;
-                exhaustedFinalAcc = acc;
-                disp('next :/')
-                break;
-            end
-            
+                
+                if abs( acc - 75 ) < 5
+                    tryAgain = 1;
+                    maxContrast = max(contrastRange);
+                    minContrast = min(contrastRange);
+                    contrasts = NaN(1,maxCycles);
+                    accuracies = NaN(1,maxCycles);
+                    cycle = -1;
+                else
+                    thresholdContrast = currentContrast;
+                    exhaustedFinalAcc = acc;
+                    disp('next :/')
+                    break;         
+                end
+
+            end   
             cycle = cycle + 1;
         end
         
@@ -163,7 +175,12 @@ if compute
         thresholdContrasts(1,i) = thresholdContrast;
     end
     time = toc(T);
-    save('dataTotal','theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','frequencyRange','nTrialsNum','time','sizeDegs')    
+    
+    if ~exist('psfSigma','var')
+        psfSigma = 7;
+    end
+    
+    save(sprintf('csf_%f_trials_psf_%f',nTrialsNum,psfSigma),'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma')    
 else    
     load(dataToLoad)
 end
@@ -302,7 +319,7 @@ if psychFn
             'stimParams', stimParams,...
             'presentationDisplay', presentationDisplay);
         
-        [acc,time] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum);
+        [acc,time] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum,psfSigma);
         
         contrastsPlot = [contrastsPlot, contrastsToPlot(i)];
         accuraciesPlot = [accuraciesPlot, acc];
