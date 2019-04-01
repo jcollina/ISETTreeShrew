@@ -64,16 +64,17 @@ whichConeType = 2;
 fovDegs = 0.4 * [1 1];
 
 %% Initialize variables
-meanRetinalIlluminance = zeros(1,nPointsToCompute);
-tMosaicExcitationMean = zeros(1,nPointsToCompute);
-eyeParameterValue = zeros(1,nPointsToCompute);
+meanRetinalIlluminance = zeros(1,nPointsToCompute + 1);
+tMosaicExcitationMean = zeros(1,nPointsToCompute + 1);
+eyeParameterValue = zeros(1,nPointsToCompute + 1);
 
 % Analytic relative sensitivity as specified from the treatment in Animal
 % Eyes. Basically, isomerizaiton rate should go up with the square of pupil
 % diameter, up with the square of inner segment diameter, and down with the
 % square of the focal length. These are the relations we are going to
 % verify here.
-s_AnimalEyes = zeros(1,nPointsToCompute);
+s_AnimalEyes = zeros(1,nPointsToCompute + 1);
+s_Iset = zeros(1,nPointsToCompute + 1);
 
 %% Create a scene
 %
@@ -88,7 +89,7 @@ for n = 1:nPointsToCompute
     % Get a vector that lets us decide the size of each of the parameters.  This
     % starts with v and increments on each loop iteration.
     vector = [n-1,n-1,n-1].*v;
-    
+        
     % Set up parameters for this itereation. We vary delta according to
     % sqrt of iteration for each parameter, just because we like the way
     % plots look when we do that.
@@ -102,58 +103,41 @@ for n = 1:nPointsToCompute
     % points in the plot.
     switch find(v)
         case 1
-            eyeParameterValue(n) = focalLengthMM;
+            eyeParameterValue(n + 1) = focalLengthMM;
             parameterName = 'Focal Length'; 
             shortParameterName = 'F'; 
             parameterUnits = 'mm';
         case 2
-            eyeParameterValue(n) = pupilDiameterMM;
+            eyeParameterValue(n + 1) = pupilDiameterMM;
             parameterName = 'Pupil Diameter';
             shortParameterName = 'P_D';
             parameterUnits = 'mm';
         case 3
-            eyeParameterValue(n) = innerSegmentDiameterUM;
+            eyeParameterValue(n + 1) = innerSegmentDiameterUM;
             parameterName = 'Inner Segment Aperture Diameter';
             shortParameterName = 'IS_D';
             parameterUnits = 'um';
     end
     
-    % Create optical image object for current parameters.
-    tOI = oiTreeShrewCreate('pupilDiameterMM', pupilDiameterMM, 'focalLengthMM', ...
-        focalLengthMM);
-    
-    % Create the mosaic
-    tMosaic = coneMosaicTreeShrewCreate(tOI.optics.micronsPerDegree, ...
-        'spatialDensity', spatialLMSdensities, ...
-        'customInnerSegmentDiameter', innerSegmentDiameterUM, ...
-        'integrationTime', 5/1000, ...
-        'fovDegs', fovDegs);
-    
-    % Compute the retinal image
-    tOI = oiCompute(tOI, testScene);
-    
-    % Get and store the retinal irradiance
-    meanRetinalIlluminance(n) = oiGet(tOI, 'mean illuminance');
-    
-    % Compute the mosaic responses (for more replicable responses, use more trials)
-    nTrialsNum = 1;
-    emPath = zeros(nTrialsNum, 1, 2);
-    
-    % Compute *treeshrew* mosaic excitation responses to treeshrew optical image
-    tMosaicExcitation = tMosaic.compute(tOI, 'emPath', emPath);
-    
-    % Find mean excitations
-    tMosaicExcitationMean(n) = ...
-        meanResponseToOpticalImage(tMosaic, tMosaicExcitation, whichConeType);
-    
-    % Calculate estimated sensitivity according to Animal Eyes
-    s_AnimalEyes(n) = 0.62 * (pupilDiameterMM^2 * innerSegmentDiameterUM^2)/ ...
-        (focalLengthMM^2);
-    
+    [s_Iset(n + 1),s_AnimalEyes(n + 1)] = getSensitivity(pupilDiameterMM,focalLengthMM,innerSegmentDiameterUM,testScene,spatialLMSdensities,fovDegs,whichConeType);    
+        
 end
+
+vT = ~ v;
+
+focalLengthMM = vT(1)*baseFocalLengthMM;
+pupilDiameterMM = vT(2)*basePupilDiameterMM;
+innerSegmentDiameterUM = vT(3)*baseInnerSegmentDiameterUM;
+
+[s_IsetZero,s_AnimalEyesZero] = getSensitivity(pupilDiameterMM,focalLengthMM,innerSegmentDiameterUM,testScene,spatialLMSdensities,fovDegs,whichConeType);    
+
+s_Iset(1) = s_IsetZero;
+s_AnimalEyes(1) = s_AnimalEyesZero;
+
+
 %ISETBio's average cone excitation for a given image is conceptually the
 %same as the "eye sensitivity" given in Animal Eyes
-s_Iset = tMosaicExcitationMean;
+
 %% Plotting
 
 x = s_AnimalEyes;
@@ -175,24 +159,14 @@ ylim([0,inf])
 title([{'Relationship Between ISETBIO and Animal Eyes Sensitivity'}, ...
     {sprintf('As %s Changes',parameterName)}])
 
-labels = cell(1,nPointsToCompute);
-for i=1:nPointsToCompute
+labels = cell(1,nPointsToCompute + 1);
+for i=1:(length(eyeParameterValue))
 labels(i) = cellstr(sprintf('%s= %.2f %s', shortParameterName, eyeParameterValue(i), parameterUnits));
 end
 
 text(x,y,labels,'VerticalAlignment','top','HorizontalAlignment','right')
-text(min(x)/3,min(y)/3,sprintf('Intercept CI = [%.2f,%.2f]', interceptCI(1),interceptCI(2)),'VerticalAlignment','top','HorizontalAlignment','left')
+text(max(x)/2,max(y)/6,sprintf('Intercept CI = [%.2f,%.2f]', interceptCI(1),interceptCI(2)),'VerticalAlignment','top','HorizontalAlignment','left')
 
 I1 = meanRetinalIlluminance./meanRetinalIlluminance(1); %illuminance for each level
 E1 = tMosaicExcitationMean./tMosaicExcitationMean(1); %efficiency for each cone (LMS) for each level
 S1 = s_Iset./s_Iset(1);
-
-%% Functions
-
-function meanResponse = meanResponseToOpticalImage(coneMosaic, coneMosaicResponse, ...
-    targetConeType)
-nTrialsNum = size(coneMosaicResponse,1);
-coneMosaicResponse  = reshape(coneMosaicResponse, [nTrialsNum numel(coneMosaic.pattern)]);
-idx = find(coneMosaic.pattern == targetConeType);
-meanResponse = mean(mean(coneMosaicResponse(:,idx)));
-end
