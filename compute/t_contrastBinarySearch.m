@@ -16,13 +16,25 @@ ieInit;
 
 %% What do you want to do?
 %
-compute = 1;
+compute = 0;
+
+loadData = 1;
 
 toDivide = 20;
 
 psfSigma = 12;
 
-dataToLoad = 'dataTotal1000_.75-1.25_psf_15.mat';
+%note:usually 10/100 seconds, experimenting here
+integrationTime = 50/1000;
+
+sizeDegs = 5;
+
+nTrialsNum = 1000;
+
+% If you're not interested in computing a new CSF, but instead want to plot
+% prevously gathered data, then set compute = 0 and specify the data you
+% want to load. The data needs to have the following
+oldDataToLoad = 'csf_1000_trials_psf_12_size_5.mat';
 
 psychFn = 0;
 
@@ -31,16 +43,16 @@ if compute
     %% Parameters
     %
     % How much data do you want to use to train the SVM?
-    nTrialsNum = 1000;
+    
     
     % What discrete sptial frequencies do you want to find the sensitivities
     % for?
-    frequencyRange = 0.75:0.25:2.5;
+    frequencyRange = 0.75:0.25:2;
     
     % What range of contrasts do you want to explore for the spatial
     % frequencies? Make it wide enough to include accuracies other than 100%
     % and 50%!
-    contrastRange = [.001,.05];
+    contrastRange = [.001,.06];
     
     % For the binary search, what range do you want it to reach before
     % stopping?
@@ -49,18 +61,17 @@ if compute
     % For the binary search, how many iterations do you want before stopping?
     % If you don't want to ever "give up" (only a good idea with a high
     % nTrialNum), set maxCycles very large.
-    maxCycles = 20;   
+    maxCycles = 15;
     
     % How big do you want the stimulus, and therefore the mosaic, to be?
     % This will dramatically affect the time it takes to run the code.
-    sizeDegs = 3;
-
+    
     % Create cone mosaic of the appropriate size
     theMosaic = coneMosaicTreeShrewCreate(75, ...
         'fovDegs', sizeDegs, ...
-        'integrationTimeSeconds', 10/1000);
+        'integrationTimeSeconds', integrationTime);
     
-%%
+    %%
     %% Initialize Variables
     %
     % Initialize cell array to store psychometric function data
@@ -69,19 +80,20 @@ if compute
     
     % Initialize vector to store threshold contrasts for each spatial frequency
     thresholdContrasts = zeros(1,length(frequencyRange));
+    finalAccuracy = zeros(1,length(frequencyRange));
     
     %% Main loop
     %
     % Begin looping over the discrete spatial frequencies chosen
     T = tic;
-    for i = 1:length(frequencyRange)
+    parfor i = 1:length(frequencyRange)
         
         % Size of testing set, based on 10-fold cross-evaluation
         nTrials = nTrialsNum/10;
         
         % Create presentation display
         presentationDisplay = displayCreate('LCD-Apple', 'viewing distance', 20/100);
-        frequencyRange(i)
+        frequencyRange(i);
         % Create parameter structure for a low spatial frequency Gabor stimulus
         stimParams = struct(...
             'spatialFrequencyCyclesPerDeg', frequencyRange(i), ...  % changing cycles/deg
@@ -135,207 +147,96 @@ if compute
             % Determine parameters for next cycle of search
             if acc < min(desiredAccRange)
                 minContrast = currentContrast;
-                disp('accuracy was low')
+                %disp('accuracy was low')
             elseif acc > max(desiredAccRange)
                 maxContrast = currentContrast;
-                disp('accuracy was high')
+                %disp('accuracy was high')
             else
                 % if reached desired range
                 thresholdContrast = currentContrast;
                 finalAcc = acc;
                 finalPrec = prec;
-                disp('next :)')
+                %disp('next :)')
                 break;
             end
             
-            % Allow for restart due to reaching maximum number of cycles
+            % If you don't make it, find the closest contrast and take that
             if cycle > maxCycles
+                temp = [abs(75-rmmissing(accuracies)) ; rmmissing(accuracies) ; rmmissing(contrasts)]';
+                temp = sortrows(temp,1);
                 
-                if abs( acc - 75 ) < 5
-                    tryAgain = 1;
-                    maxContrast = max(contrastRange);
-                    minContrast = min(contrastRange);
-                    contrasts = NaN(1,maxCycles);
-                    accuracies = NaN(1,maxCycles);
-                    cycle = -1;
-                else
-                    thresholdContrast = currentContrast;
-                    exhaustedFinalAcc = acc;
-                    disp('next :/')
-                    break;         
-                end
-
-            end   
+                thresholdContrast = temp(1,3);
+                finalAcc = temp(1,2);
+                %disp('not quite there :/')
+                break
+                
+            end
+            
             cycle = cycle + 1;
+            
         end
         
         % Save variables
         contrastsTotal{1,i} = rmmissing(contrasts);
         accuraciesTotal{1,i} = rmmissing(accuracies);
         thresholdContrasts(1,i) = thresholdContrast;
+        finalAccuracy(1,i) = finalAcc;
     end
     time = toc(T);
     
     if ~exist('psfSigma','var')
         psfSigma = 7;
     end
-    
-    save(sprintf('csf_%f_trials_psf_%f',nTrialsNum,psfSigma),'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma')    
-else    
-    load(dataToLoad)
+    dataToSave = sprintf('csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs);
+    if ~exist(dataToSave, 'file')
+    save(strcat(dataToSave,'2'),'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime') ;
+    else
+    end
+    dataToLoad = dataToSave;
+elseif loadData
+    data = load(oldDataToLoad);
 end
 
 %% Plot data
 %
 % Visualize relationship between contrast and accuracy
-figure(1)
+
+plotBinarySearch(data)
+
+plotCSF(data,toDivide)
+
+%% Functions
+
+function plotBinarySearch(data)
+
+maxCont = max(cellfun(@(x) max(x),data.contrastsTotal));
+minCont = min(cellfun(@(x) min(x),data.contrastsTotal));
+
+figure()
 hold on
-xlim([.001,.03])
-for i = 1:length(frequencyRange)
-    tempMat = [contrastsTotal{1,i};accuraciesTotal{1,i}];
+for i = 1:length(data.frequencyRange)
+    tempMat = [data.contrastsTotal{1,i};data.accuraciesTotal{1,i}];
     mat = sortrows(tempMat');
     color = rand(1,3);
     plot(mat(:,1),mat(:,2),'LineWidth',2,'color',color)
-    plot(tempMat(1,size(tempMat,2)),tempMat(2,size(tempMat,2)),'*','MarkerSize',10,'color',color)
+    plot(data.thresholdContrasts(i),data.finalAccuracy(i),'*','MarkerSize',10,'color',color)
 end
-%set(gca, 'XScale', 'log')
+
+if maxCont > .031
+    set(gca,'xlim',[minCont,maxCont])
+    contrastTicks = [0.005,0.01 0.02 0.03, maxCont ];
+    contrastTickLabels = {'0.005','.01', '.02', '.03', sprintf('%.0f',maxCont)};
+else
+    set(gca,'xlim',[minCont,.03])
+    contrastTicks = [0.005 0.01 0.02 0.03];
+    contrastTickLabels = {'0.005', '.01',  '.02',  '.03'};
+end
+set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
+
+set(gca, 'XScale', 'log')
 set(gca, 'FontSize', 16)
 xlabel('\it Contrast (Michelson)');
 ylabel('\it SVM Accuracy');
 title('Psychometric Function Approximations')
-
-sensitivity = 1./thresholdContrasts;
-
-% Visualize relationship between spatial frequency and sensitivity (CSF)
-figure(2)
-
-load compute/ts_CSF_M.mat
-
-ts1 = ts_CSF_M{1};
-ts2 = ts_CSF_M{2};
-ts3 = ts_CSF_M{3};
-
-plot( frequencyRange , sensitivity/toDivide,'b.-','MarkerSize',20)
-hold on
-plot(ts1(:,1),ts1(:,2),'k.-')
-plot(ts2(:,1),ts2(:,2),'kx-')
-plot(ts3(:,1),ts3(:,2),'ko-')
-%set(gcf, 'color', 'none');
-%set(gca, 'color', 'none');
-
-set(gca,'ylim',[0,max(sensitivity)])
-
-if max(frequencyRange) > 2
-    set(gca,'xlim',[.1,max(frequencyRange)])
-    contrastTicks = [0.1 0.2 0.5 1.0 2.0, max(frequencyRange) ];
-    contrastTickLabels = {'.1', '.2', '.5', '1', '2', sprintf('%.0f',max(frequencyRange))};
-else
-    set(gca,'xlim',[.1,2])
-    contrastTicks = [0.1 0.2 0.5 1.0 2.0 ];
-    contrastTickLabels = {'.1', '.2', '.5', '1', '2'};
-end
-    set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
-set(gca, 'XScale', 'log')
-set(gca, 'YScale', 'log')
-set(gca, 'FontSize', 16)
-xlabel('\it Spatial Frequency');
-ylabel('\it Sensitivity');
-title(sprintf('CSF, n = %.2f',nTrialsNum))
-
-
-%%
-
-if psychFn
-    %
-    % %at this point, we have a psychometric function of accuracy as a function
-    % %of contrast that should sample the threshold well
-    
-    % if I want to, I can compute an actual psychometric function here:
-    
-    %pick the first one I chose
-    %%
-    j = 1;
-    numSearchPoints = 5;
-    
-    nTrials = nTrialsNum/10;
-        
-    while 1
-        a = length(contrastsTotal{1,j});
-        if a>10
-            break;
-        end
-        j = j+1;
-    end
-    
-    contrastsTemp = contrastsTotal{1,j};
-    
-    thresholdContrasts = contrastsTemp(length(contrastsTemp) - ...
-        numSearchPoints:length(contrastsTemp));
-    
-    minC = min(thresholdContrasts);
-    maxC = max(thresholdContrasts);
-    rangeC = 0.005;%max(thresholdContrasts) - min(thresholdContrasts);
-    
-    minSample = minC - 2 * rangeC;
-    maxSample = maxC + 2 * rangeC;
-    
-    contrastsToPlot = minSample : rangeC/2 : maxSample
-    %%
-    if compute == false
-
-        % Size of testing set, based on 10-fold cross-evaluation
-        
-        % Create presentation display
-        presentationDisplay = displayCreate('LCD-Apple', 'viewing distance', 20/100);
-        
-        % Create parameter structure for a low spatial frequency Gabor stimulus
-        stimParams = struct(...
-            'spatialFrequencyCyclesPerDeg', frequencyRange(i), ...  % changing cycles/deg
-            'orientationDegs', 0, ...               % 0 degrees
-            'phaseDegs', 90, ...                    % spatial phase degrees, 0 = cos, 90 = sin
-            'sizeDegs', sizeDegs, ...               % 14 x 14 size
-            'sigmaDegs', 100, ...                   % sigma of Gaussian envelope
-            'meanLuminanceCdPerM2', 35, ...         % 35 cd/m2 mean luminance
-            'pixelsAlongWidthDim', [], ...          % pixels- width dimension
-            'pixelsAlongHeightDim', [] ...          % pixel- height dimension
-            );
-        
-        % Generate null scene (contrast = 0)
-        stimParams.contrast = 0.0;
-        
-        nullScene = generateGaborScene(...
-            'stimParams', stimParams,...
-            'presentationDisplay', presentationDisplay);
-    
-    end
-    
-    contrastsPlot = [];
-    accuraciesPlot = [];
-    for i = 1:length(contrastsToPlot)
-        
-        stimParams.contrast = contrastsToPlot(i);
-        
-        testScene = generateGaborScene(...
-            'stimParams', stimParams,...
-            'presentationDisplay', presentationDisplay);
-        
-        [acc,time] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum,psfSigma);
-        
-        contrastsPlot = [contrastsPlot, contrastsToPlot(i)];
-        accuraciesPlot = [accuraciesPlot, acc];
-        
-    end
-    
-    [contrastThreshold,hiResContrasts,hiResPerformance] = getPsychometricFit(contrastsPlot,accuraciesPlot,nTrials);
-    %%
-    plot(hiResContrasts, hiResPerformance, 'r-', 'LineWidth', 1.5);
-    %%
-    hold on
-    
-    plot(contrastsPlot,accuraciesPlot, 'ko', 'MarkerSize', 12, ...
-        'MarkerFaceColor', [0.7 0.5 0.5], 'MarkerEdgeColor', [0.5 0 0]);
-    %%
-    set(gca, 'YLim', [0.4 1.05], 'XScale', 'log')
-    hold off
-    
+hold off
 end
