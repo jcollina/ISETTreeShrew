@@ -18,13 +18,19 @@ ieInit;
 %
 compute = 1;
 
-loadData = 1;
+loadData = 0;
 
 toDivide = 20;
 
+%min cone separation of 6 -> ~ 32,000 cones/mm^2
+%min cone separation of 7.5 -> ~ 22,000 cones/mm^2
+%min cone separation of 8.5 -> ~ 16,000 cones/mm^2
+
+cone_spacing = 8.5; %microns
+
 psfSigma = 12;
 
-%note:usually 10/100 seconds, experimenting here
+%note:usually 10/1000 seconds, experimenting here
 integrationTime = 10/1000;
 
 sizeDegs = 5;
@@ -69,6 +75,7 @@ if compute
     % Create cone mosaic of the appropriate size
     theMosaic = coneMosaicTreeShrewCreate(75, ...
         'fovDegs', sizeDegs, ...
+        'customLambda', cone_spacing, ...
         'integrationTimeSeconds', integrationTime);
     
     %%
@@ -160,15 +167,22 @@ if compute
                 break;
             end
             
-            % If you don't make it, find the closest contrast and take that
+            % If you don't make it, find the closest contrast- if that's within 1, take that
             if cycle > maxCycles
                 temp = [abs(75-rmmissing(accuracies)) ; rmmissing(accuracies) ; rmmissing(contrasts)]';
                 temp = sortrows(temp,1);
                 
                 thresholdContrast = temp(1,3);
-                finalAcc = temp(1,2);
-                %disp('not quite there :/')
-                break
+                tempAcc = temp(1,2);
+                if abs(75-tempAcc) < 1
+                    %disp('not quite there :/')
+                    finalAcc = tempAcc
+                    break
+                else
+                    contrasts = NaN(1,maxCycles);
+                    accuracies = NaN(1,maxCycles);
+                    cycle = -1;
+                end
                 
             end
             
@@ -187,12 +201,20 @@ if compute
     if ~exist('psfSigma','var')
         psfSigma = 7;
     end
-    dataToSave = sprintf('csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs);
-    if ~exist(dataToSave, 'file')
-    save(strcat(dataToSave,'2'),'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime') ;
-    else
+    
+    dataToSave = sprintf('cd_min_csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs);
+    
+    i = 1;
+    dataToSaveTemp = dataToSave;
+    
+    while exist(dataToSaveTemp, 'file')
+        dataToSaveTemp = strcat(dataToSave,num2str(i));
+        i = i + 1;
     end
-    data = load(dataToSave);
+    
+    save(dataToSaveTemp,'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime','cone_spacing')
+    
+    data = load(dataToSaveTemp);
 elseif loadData
     data = load(oldDataToLoad);
 end
@@ -202,7 +224,7 @@ end
 % Visualize relationship between contrast and accuracy
 
 plotBinarySearch(data)
-
+%%
 plotCSF(data,toDivide)
 
 %% Functions
