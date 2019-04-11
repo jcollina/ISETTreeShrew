@@ -16,7 +16,7 @@ ieInit;
 
 %% What do you want to do?
 %
-compute = 0;
+compute = 1;
 
 loadData = 1;
 
@@ -25,7 +25,7 @@ toDivide = 20;
 psfSigma = 12;
 
 %note:usually 10/100 seconds, experimenting here
-integrationTime = 50/1000;
+integrationTime = 10/1000;
 
 sizeDegs = 5;
 
@@ -52,7 +52,7 @@ if compute
     % What range of contrasts do you want to explore for the spatial
     % frequencies? Make it wide enough to include accuracies other than 100%
     % and 50%!
-    contrastRange = [.001,.06];
+    contrastRange = [.001,.03];
     
     % For the binary search, what range do you want it to reach before
     % stopping?
@@ -192,7 +192,7 @@ if compute
     save(strcat(dataToSave,'2'),'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime') ;
     else
     end
-    dataToLoad = dataToSave;
+    data = load(dataToSave);
 elseif loadData
     data = load(oldDataToLoad);
 end
