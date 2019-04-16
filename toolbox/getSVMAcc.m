@@ -1,9 +1,16 @@
-function [percentCorrect,svmPrecision,time] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum,psfSigma)
+function [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene, varargin)
 
-if ~exist('psfSigma','var')
-     % default psfSigma = 7 microns
-      psfSigma = 7;
-end
+p = inputParser;
+p.addParameter('nTrialsNum', 250, @isnumeric);
+p.addParameter('nFolds', 10, @isnumeric);
+p.addParameter('psfSigma', 7, @isnumeric);
+
+% Parse input
+p.parse(varargin{:});
+
+psfSigma = p.Results.psfSigma;
+nFolds = p.Results.nFolds;
+nTrialsNum = p.Results.nTrialsNum;
 
 tic;
 
@@ -92,8 +99,7 @@ classificationMatrixProjection = classificationMatrix * pcVectors(:,1:pcComponen
 svm = fitcsvm(classificationMatrixProjection,classes);
 
 % Perform a 10-fold cross-validation on the trained SVM model
-kFold = 10;
-CVSVM = crossval(svm,'KFold',kFold);
+CVSVM = crossval(svm,'KFold',nFolds);
 
 % Compute classification loss for the in-sample responses using a model
 % trained on out-of-sample responses
@@ -101,8 +107,8 @@ CVSVM = crossval(svm,'KFold',kFold);
 fractionCorrect = 1 - kfoldLoss(CVSVM,'lossfun','classiferror','mode','individual');
 %
 % Average percent correct across all folds
-percentCorrect = mean(fractionCorrect) * 100;
-svmPrecision = std(percentCorrect);
+percentCorrect = fractionCorrect.*100;%mean(fractionCorrect) * 100;
+svmError = std(percentCorrect)/sqrt(length(percentCorrect));
 
 time = toc;
 
