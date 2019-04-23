@@ -1,4 +1,4 @@
-function [contrastsToPlot,accuraciesToPlot,contrastThreshold,hiResContrasts,hiResPerformance] = psychFN(data)
+function [contrastsToPlot,accuraciesToPlot,contrastThreshold,hiResContrasts,hiResPerformance] = psychometricFromBinarySearch(data)
 
 sizeDegs = data.sizeDegs;
 theMosaic = data.theMosaic;
@@ -20,8 +20,10 @@ numSearchPoints = 10;
 nTrials = nTrialsNum/10;
 
 while 1
+    
     a = data.contrastsTotal{1,j};
     b = a(length(a)-numSearchPoints:length(a));
+    
     if a > 12 && length(unique(b)) > 5
         break;
     end
@@ -118,7 +120,7 @@ else
     contrastTicks = [0.005 0.01 0.02 0.03];
     contrastTickLabels = {'0.005', '.01',  '.02',  '.03'};
 end
-    set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
+set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
 set(gca, 'YLim', [40 105], 'XScale', 'log')
 set(gca, 'FontSize', 16)
 xlabel('\it Contrast (Michelson)');

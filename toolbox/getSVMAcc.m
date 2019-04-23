@@ -1,7 +1,21 @@
 function [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene, varargin)
+% Calculate the accuracy of an SVM trained to discriminate between a test
+% stimulus and a null stimulus using a given cone mosaic.
+%
+% Syntax:
+%   [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene, varargin)
+%
+
+% Optional arguments:
+% nTrialsNum:   Number of iterations to be trained upon
+% species:      'treeshrew' or 'human' optics?
+% nFolds:       How many folds to be used in k-fold validation?
+% psfSigma:     For the optics, what's the spread of the point-spread
+%               function?
 
 p = inputParser;
 p.addParameter('nTrialsNum', 250, @isnumeric);
+p.addParameter('species', 'treeshrew');
 p.addParameter('nFolds', 10, @isnumeric);
 p.addParameter('psfSigma', 7, @isnumeric);
 
@@ -15,16 +29,22 @@ nTrialsNum = p.Results.nTrialsNum;
 tic;
 
 emPathLength = 1;
-
 taskIntervals = 2;
-
 emPath = zeros(nTrialsNum, emPathLength, 2);
 
 % Generate wavefront-aberration derived ts optics
-    theOI = oiTreeShrewCreate(...
-        'inFocusPSFsigmaMicrons', psfSigma ...
-    );
-
+switch species
+    case 'treeshrew'        
+        theOI = oiTreeShrewCreate(...
+            'inFocusPSFsigmaMicrons', psfSigma ...
+            );
+    case 'human'
+        theOI = oiCreate(...
+            'inFocusPSFsigmaMicrons', psfSigma ...
+            );
+    otherwise
+        error('species should be treeshrew or human')
+end
 % Compute the retinal image of the test stimulus
 theTestOI = oiCompute(theOI, testScene);
 
@@ -89,7 +109,7 @@ else
 end
 
 % Find principal components of the responses
-[pcVectors, ~, ~, ~,varianceExplained] = pca(classificationMatrix);
+[pcVectors, ~, ~, ~, ~] = pca(classificationMatrix);
 
 % Project the responses onto the space formed by the first 2 PC vectors
 pcComponentsNum = 2;
@@ -108,7 +128,6 @@ fractionCorrect = 1 - kfoldLoss(CVSVM,'lossfun','classiferror','mode','individua
 %
 % Average percent correct across all folds
 percentCorrect = fractionCorrect.*100;%mean(fractionCorrect) * 100;
-svmError = std(percentCorrect)/sqrt(length(percentCorrect));
 
 time = toc;
 

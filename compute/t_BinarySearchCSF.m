@@ -47,7 +47,9 @@
 %   4) Plot the sensitivity as a function of the spatial frequency
 
 % See also:
-%   coneMosaicTreeShrewCreate ls_inferenceTreeShrewBinarySVM getSVMAcc
+%   coneMosaicTreeShrewCreate 
+%   ls_inferenceTreeShrewBinarySVM 
+%   getSVMAcc
 %   getPsychometricFit
 
 % History:
@@ -306,12 +308,17 @@ end
 %
 % Visualize relationship between contrast and accuracy
 
+% First, plot the iterations of each binary search in order to make sure
+% the SVM results are monotonic. The threshold contrasts are marked by
+% asterisks.
 plotBinarySearch(data)
-%%
+
+% If the SVM results are monotonic, it means that the ~75% contrast found
+% in the binary search is the only contrast with that accuracy. Now, we can
+% plot each threshold contrast as a function of the spatial frequency.
 plotCSF(data,toDivide)
 
 %% Functions
-
 function plotBinarySearch(data)
 
 maxCont = max(cellfun(@(x) max(x),data.contrastsTotal));

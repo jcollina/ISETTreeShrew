@@ -1,8 +1,45 @@
-%% t_contrastBinarySearch
+%% t_BinarySearchCSF
 % Use a binary SVM and binary search algorithm to create a contrast
-% sensitivity function for the tree shrew.
+% sensitivity function.
 %
-% Description:
+% Description: 
+%   Essentially trying to simulate Casagrande's 1984 CSF method in ISETBio.
+%   The key steps in that paper are as follows:
+%   1) Choose the specific spatial frequencies for which you will
+%  determine the sensitivity to contrast
+%   2) For each spatial frequency, determine the contrast level (aka 
+% the contrast threshold) that causes the tree shrews to accurately 
+% discern the contrast 75% of the time
+%
+%       ** In ISETBio, this step is accomplished by using a support vector
+%       machine (SVM) approach to determine the fraction of the time that
+%       the algorithm can detect a difference in the mosaic excitation
+%       between a null scene and a scene with a contrast. A binary search
+%       algorithm is used to identify the specific contrast that leads to
+%       75% of the SVM predictions being accurate. 
+
+%       The binary search works as follows: The spatial frequency of the
+%       gabor stimulus is set at the beginning of the search, and is held
+%       constant throughout. A minimum and maximum contrast is chosen, with
+%       the assumption that the 75% contrast is within the chosen range. 
+%       The steps involved in the binary search process are well-described
+%       in https://en.wikipedia.org/wiki/Binary_search_algorithm.  
+
+%       Because there is some variability in the SVM results, it is
+%       possible for the binary search algorithm to focus on the wrong
+%       contrast, without reaching the desired accuracy. For 1000 trials
+%       and 10 folds, the SVM results usually have a standard error between
+%       1% and 2%. We recognize this problem by setting a maximum number of
+%       iterations. If that number of iterations is reached without the
+%       desired contrast being found, then the code checks for the contrast
+%       that led to an accuracy closest to 75%. If 75% falls within a 99%
+%       CI for that SVM, then we use that contrast as our "threshold
+%       contrast" and move on to the next spatial frequency.
+
+%   3) Calculate the contrast sensitivity at each spatial frequency by
+% taking the reciprocal of the threshold contrast 
+%   4) Plot the sensitivity as a function of the spatial frequency
+
 % ...
 % See also:
 %
@@ -16,9 +53,18 @@ ieInit;
 
 %% What do you want to do?
 %
-compute = 1;
 
-loadData = 0;
+% If you're not interested in computing a new CSF, but instead want to plot
+% prevously gathered data, then set compute = 0 and specify the data you
+% want to load.
+
+compute = 0;
+
+loadData = 1;
+oldDataToLoad = '2cd_min_csf_1000_trials_psf_12_size_5.mat';
+
+nameData = 0;
+%dataName = 'maxConeCSF';
 
 toDivide = 20;
 
@@ -26,7 +72,7 @@ toDivide = 20;
 %min cone separation of 7.5 -> ~ 22,000 cones/mm^2
 %min cone separation of 8.5 -> ~ 16,000 cones/mm^2
 
-cone_spacing = 8.5; %microns
+cone_spacing = 6; %microns
 
 psfSigma = 12;
 
@@ -36,11 +82,6 @@ integrationTime = 10/1000;
 sizeDegs = 5;
 
 nTrialsNum = 1000;
-
-% If you're not interested in computing a new CSF, but instead want to plot
-% prevously gathered data, then set compute = 0 and specify the data you
-% want to load. The data needs to have the following
-oldDataToLoad = 'csf_1000_trials_psf_12_size_5.mat';
 
 psychFn = 0;
 
@@ -88,7 +129,7 @@ if compute
     % Initialize vector to store threshold contrasts for each spatial frequency
     thresholdContrasts = zeros(1,length(frequencyRange));
     finalAccuracy = zeros(1,length(frequencyRange));
-    
+    finalSE = zeros(1,length(frequencyRange));
     %% Main loop
     %
     % Begin looping over the discrete spatial frequencies chosen
@@ -127,6 +168,7 @@ if compute
         minContrast = min(contrastRange);
         contrasts = NaN(1,maxCycles);
         accuracies = NaN(1,maxCycles);
+        standardError = NaN(1,maxCycles);
         cycle = 0;
         
         % Start search
@@ -145,11 +187,17 @@ if compute
             
             % Use a binary SVM to get a measure of accuracy in terms of determining
             % which stimulus had gratings
-            [acc,prec,t] = getSVMAcc(theMosaic, testScene, nullScene, nTrialsNum,psfSigma);
-            
+            %%
+            [svm_results, t] = getSVMAcc(theMosaic, testScene, nullScene, 'nTrialsNum', 100, 'psfSigma' , psfSigma)
+            %%
+            acc = mean(svm_results);
+            acc_SE = std(svm_results)/sqrt(length(svm_results)); 
+            %%
             % Save variables
             contrasts(cycle+1) = currentContrast;
             accuracies(cycle+1) = acc;
+            standardError(cycle+1) = acc_SE;
+            
             
             % Determine parameters for next cycle of search
             if acc < min(desiredAccRange)
@@ -161,26 +209,31 @@ if compute
             else
                 % if reached desired range
                 thresholdContrast = currentContrast;
-                finalAcc = acc;
-                finalPrec = prec;
+                finalAcctemp = acc;
+                finalSE = acc_SE;
                 %disp('next :)')
                 break;
             end
             
             % If you don't make it, find the closest contrast- if that's within 1, take that
             if cycle > maxCycles
-                temp = [abs(75-rmmissing(accuracies)) ; rmmissing(accuracies) ; rmmissing(contrasts)]';
+                temp = [abs(75-rmmissing(accuracies)) ; rmmissing(accuracies) ; rmmissing(contrasts) ; rmmissing(standardError)]';
                 temp = sortrows(temp,1);
                 
                 thresholdContrast = temp(1,3);
                 tempAcc = temp(1,2);
-                if abs(75-tempAcc) < 1
-                    %disp('not quite there :/')
-                    finalAcc = tempAcc
+                tempSE = temp(1,4);
+                
+                %if abs(75-tempAcc) < 1
+                if (tempAcc-2*tempSE) < 75 && (tempAcc+2*tempSE) > 75
+                %disp('not quite there :/')
+                    finalAcctemp = tempAcc
+                    finalSEtemp = tempSE
                     break
                 else
                     contrasts = NaN(1,maxCycles);
                     accuracies = NaN(1,maxCycles);
+                    standardError = NaN(1,maxCycles);
                     cycle = -1;
                 end
                 
@@ -194,26 +247,32 @@ if compute
         contrastsTotal{1,i} = rmmissing(contrasts);
         accuraciesTotal{1,i} = rmmissing(accuracies);
         thresholdContrasts(1,i) = thresholdContrast;
-        finalAccuracy(1,i) = finalAcc;
+        finalAccuracy(1,i) = finalAcctemp;
+        finalSE(1,i) = finalSEtemp;
     end
     time = toc(T);
     
     if ~exist('psfSigma','var')
         psfSigma = 7;
     end
-    
-    dataToSave = sprintf('cd_min_csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs);
-    
+    %%
+    if nameDame
+        dataToSave = dataName;
+    else
+        dataToSave = sprintf('csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs);
+    end
+    %%
     i = 1;
+    
     dataToSaveTemp = dataToSave;
     
     while exist(dataToSaveTemp, 'file')
-        dataToSaveTemp = strcat(dataToSave,num2str(i));
+        dataToSaveTemp = strcat(num2str(i),dataToSave);
         i = i + 1;
     end
-    
+    %%
     save(dataToSaveTemp,'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime','cone_spacing')
-    
+    %%
     data = load(dataToSaveTemp);
 elseif loadData
     data = load(oldDataToLoad);
