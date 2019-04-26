@@ -1,18 +1,19 @@
-%% t_BinarySearchCSF
+%% t_BinarySearchCSF (Human/Treeshrew)
 % Use a binary SVM and binary search algorithm to create a contrast
 % sensitivity function.
 %
 % Description:
-%   Essentially trying to simulate Casagrande's 1984 CSF method in ISETBio.
-%   The key steps are as follows:
+%   Essentially trying to simulate Casagrande's 1984 CSF method (used with
+%   treeshrews) in ISETBio. However, the steps can be used for simulating
+%   the task on humans optics as well. The key steps are as follows:
 %   
 %   1) Choose the specific spatial frequencies for which you will
 % determine the sensitivity to contrast. Currently, ISETBio can only model
 % the high-frequency CSF dropoff, not the low-frequency dropoff. Casagrande
-% found that the high-frequency dropoff is between 0.75 and 2
-% cycles/degree.
+% found that the high-frequency dropoff for tree shrews was between 0.75
+% and 2 cycles/degree.
 %
-%   2) For each spatial frequency, determine the contrast level (aka
+%   2) For each spatial frequency, determine the contrast level (AKA
 % the contrast threshold) that causes the tree shrews to accurately discern
 % the contrast 75% of the time.
 %
@@ -49,8 +50,8 @@
 % See also:
 %   coneMosaicTreeShrewCreate 
 %   ls_inferenceTreeShrewBinarySVM 
-%   getSVMAcc
-%   getPsychometricFit
+
+% Tools used: getSVMAcc, plotCSF
 
 % History:
 %   03/14/19 jsc  Wrote initial version.
@@ -74,10 +75,6 @@ loadData = 1;
 % If so, what's the name of that data file? Include the .mat .
 oldDataToLoad = '';
 
-% Do you want to use one of the binary searches to resample the threhold
-% area and plot the psychometric function?
-psychFn = 0;
-
 if compute
     
     %% Parameters
@@ -88,6 +85,10 @@ if compute
     % If so, what name? No need to include .mat here.
     dataName = '';
 
+    % What species are you interested in simulating? Choose 'treeshrew' or
+    % 'human'.
+    species = 'treeshrew';
+    
     % When plotting, it is important to remember that the sensitivity of
     % the ideal observer will be much higher than the sensitivity that is
     % behaviorally observed. This has been shown to be at least a factor of
@@ -98,20 +99,18 @@ if compute
     % How much data do you want to use to train the SVM?
     nTrialsNum = 1000;
     
-    % What do you want the cone density of your mosaic to be? This is
-    % controlled by changing the minimum cone separation.
-    %   - min cone separation of 6 um     ->      ~ 32,000 cones/mm^2 - min
-    %   cone separation of 7.5 um   ->      ~ 22,000 cones/mm^2 - min cone
-    %   separation of 8.5 um   ->      ~ 16,000 cones/mm^2
+    % If you're simulating tree shrews, what do you want the cone density
+    % of your mosaic to be? This is controlled by changing the minimum cone
+    % separation.
+    %   - min cone separation of 6 um     ->      ~ 32,000 cones/mm^2 
+    %   - min cone separation of 7.5 um   ->      ~ 22,000 cones/mm^2 
+    %   - min cone separation of 8.5 um   ->      ~ 16,000 cones/mm^2
     cone_spacing = 6; %um
 
     % What do you want the standard deviation of the point-spread function
     % to be? For humans, this value is approximately 7 um. For tree shrews,
     % our preliminary analyses have indicated the value is around 12 um.
     psfSigma = 12; %um
-
-    % What do you want the integration time to be?
-    integrationTime = 10/1000;
 
     % How large do you want the stimulus, and therefore the activated cone
     % mosaic, to be? The Casagrande paper used a stimulus of ~14 x 14
@@ -120,8 +119,9 @@ if compute
     sizeDegs = 5; % degrees per side
 
     % What discrete sptial frequencies do you want to find the
-    % sensitivities for? The Casagrande paper showed a CSF dropoff in the
-    % range of 0.75 - 2 cycles/degree
+    % sensitivities for? The Casagrande paper showed a treeshrew CSF
+    % dropoff in the range of 0.75 - 2 cycles/degree, while for humans it
+    % is in the range of 1 - 10 cycles/degree.
     frequencyRange = 0.75:0.25:2; %cycles per degree
     
     % What range of contrasts do you want to explore for the spatial
@@ -138,13 +138,6 @@ if compute
     % a high nTrialNum), set maxCycles very large.
     maxCycles = 15;
     
-    % Create a cone mosaic of the appropriate size and cone density.
-    theMosaic = coneMosaicTreeShrewCreate(75, ...
-        'fovDegs', sizeDegs, ...
-        'customLambda', cone_spacing, ...
-        'integrationTimeSeconds', integrationTime);
-    
-    %%
     %% Initialize Variables
     %
     % Initialize cell array to store psychometric function data
@@ -157,9 +150,28 @@ if compute
     finalAccuracy = zeros(1,length(frequencyRange));
     finalSE = zeros(1,length(frequencyRange));
     
+    %% Create a cone mosaic
+    %
+    % Create a cone mosaic of the appropriate size and cone density
+    switch species
+        case 'treeshrew'
+            theMosaic = coneMosaicTreeShrewCreate(75, ...
+                'fovDegs', sizeDegs, ...
+                'customLambda', cone_spacing);
+        case 'human'
+            theMosaic = coneMosaicHex(7, ...
+                'eccBasedConeDensity', true, ...
+                'maxGridAdjustmentIterations',200, ...
+                'fovDegs', sizeDegs);
+        otherwise
+            error('species should be treeshrew or human')
+    end
+    
     %% Main loop
     %
     % Begin looping over the discrete spatial frequencies chosen
+    fprintf('Progress:\n');
+    fprintf(['\n' repmat('.',1,length(frequencyRange)) '\n\n']);
     T = tic;
     parfor i = 1:length(frequencyRange)
         
@@ -215,7 +227,7 @@ if compute
             % Use a binary SVM to get a measure of accuracy in terms of
             % determining which stimulus had gratings
             %%
-            [svm_results, t] = getSVMAcc(theMosaic, testScene, nullScene, 'nTrialsNum', 100, 'psfSigma' , psfSigma)
+            [svm_results, t] = getSVMAcc(theMosaic, testScene, nullScene, 'nTrialsNum', 100, 'psfSigma' , psfSigma,'species',species)
             %%
             acc = mean(svm_results);
             acc_SE = std(svm_results)/sqrt(length(svm_results)); 
@@ -275,6 +287,8 @@ if compute
         thresholdContrasts(1,i) = thresholdContrast;
         finalAccuracy(1,i) = finalAcctemp;
         finalSE(1,i) = finalSEtemp;
+        
+        fprintf('\b|\n');
     end
     time = toc(T);
     
@@ -285,7 +299,7 @@ if compute
     if nameData
         dataToSave = strcat(dataName,'.mat');
     else
-        dataToSave = sprintf('csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs);
+        dataToSave = [species,sprintf('_csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs)];
     end
     %%
     i = 1;
@@ -297,7 +311,7 @@ if compute
         i = i + 1;
     end
     %%
-    save(dataToSaveTemp,'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime','cone_spacing')
+    save(dataToSaveTemp,'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime','cone_spacing','species')
     %%
     data = load(dataToSaveTemp);
 elseif loadData
@@ -316,7 +330,10 @@ plotBinarySearch(data)
 % If the SVM results are monotonic, it means that the ~75% contrast found
 % in the binary search is the only contrast with that accuracy. Now, we can
 % plot each threshold contrast as a function of the spatial frequency.
-plotCSF(data,toDivide)
+
+% Do you want to plot Casagrande's data as well?
+expData = 'TRUE';
+plotCSF(data,'toDivide',toDivide,'expData',expData)
 
 %% Functions
 function plotBinarySearch(data)

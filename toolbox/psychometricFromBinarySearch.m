@@ -1,14 +1,26 @@
-function [contrastsToPlot,accuraciesToPlot,contrastThreshold,hiResContrasts,hiResPerformance] = psychometricFromBinarySearch(data)
+%% PsychometricFromBinarySearch
+
+% Load dataset created using t_BinarySearchCSF. Data must have the
+% variables:
+%       sizeDegs
+%       theMosaic
+%       nTrialsNum
+%       psfSigma
+%       contrastsTotal
+%       frequencyRange
+
+% Because increasing the number of trials shifts the CSF curve upwards, it
+% is important to use the same number of trials as the loaded data.
+% Therefore, especially if the original data had a large nTrialsNum, this
+% code can take a long time to run.
+
+
+data = load('2cd_max_csf_1000_trials_psf_12_size_5.mat');
 
 sizeDegs = data.sizeDegs;
 theMosaic = data.theMosaic;
 nTrialsNum = data.nTrialsNum;
 psfSigma = data.psfSigma;
-
-%
-% %at this point, we have a psychometric function of accuracy as a function
-% %of contrast that should sample the threshold well
-
 % if I want to, I can compute an actual psychometric function here:
 
 %pick the first one I chose
@@ -99,7 +111,13 @@ end
 toc
 %%
 [contrastThreshold,hiResContrasts,hiResPerformance] = getPsychometricFit(contrastsToPlot,accuraciesToPlot/100,nTrials);
-%%
+
+plotPsychometricFunction(hiResContrasts,hiResPerformance,contrastsToPlot,accuraciesToPlot,contrastThreshold,spatFreq)
+
+%% Functions
+
+function plotPsychometricFunction(hiResContrasts,hiResPerformance,contrastsToPlot,accuraciesToPlot,contrastThreshold,spatFreq)
+
 figure()
 plot(hiResContrasts,100*hiResPerformance, 'r-', 'LineWidth', 1.5);
 
@@ -114,7 +132,7 @@ line([min(contrastsToPlot),contrastThreshold],[75,75])
 if max(contrastsToPlot) > .031
     set(gca,'xlim',[min(contrastsToPlot),max(contrastsToPlot)])
     contrastTicks = [0.005,0.01 0.02 0.03, max(contrastsToPlot) ];
-    contrastTickLabels = {'0.005','.01', '.02', '.03', int2str(round(maxCont))};
+    contrastTickLabels = {'0.005','.01', '.02', '.03', int2str(round(maxContrastsToPlot))};
 else
     set(gca,'xlim',[min(contrastsToPlot),.03])
     contrastTicks = [0.005 0.01 0.02 0.03];
@@ -127,4 +145,6 @@ xlabel('\it Contrast (Michelson)');
 ylabel('\it SVM Accuracy');
 title(sprintf('Individual Psychometric Function for\nSpatial Frequency of %.0f cpd',spatFreq))
 hold off
+
 end
+

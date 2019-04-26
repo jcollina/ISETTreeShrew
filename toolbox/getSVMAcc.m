@@ -15,7 +15,7 @@ function [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene, vara
 
 p = inputParser;
 p.addParameter('nTrialsNum', 250, @isnumeric);
-p.addParameter('species', 'treeshrew');
+p.addParameter('species', 'treeshrew', @ischar);
 p.addParameter('nFolds', 10, @isnumeric);
 p.addParameter('psfSigma', 7, @isnumeric);
 
@@ -25,6 +25,7 @@ p.parse(varargin{:});
 psfSigma = p.Results.psfSigma;
 nFolds = p.Results.nFolds;
 nTrialsNum = p.Results.nTrialsNum;
+species = p.Results.species;
 
 tic;
 
@@ -126,7 +127,7 @@ CVSVM = crossval(svm,'KFold',nFolds);
 %
 fractionCorrect = 1 - kfoldLoss(CVSVM,'lossfun','classiferror','mode','individual');
 %
-% Average percent correct across all folds
+% Percent correct across all folds
 percentCorrect = fractionCorrect.*100;%mean(fractionCorrect) * 100;
 
 time = toc;
