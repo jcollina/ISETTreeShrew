@@ -1,3 +1,4 @@
+function t_BinarySearchCSF
 %% t_BinarySearchCSF (Human/Treeshrew)
 % Use a binary SVM and binary search algorithm to create a contrast
 % sensitivity function.
@@ -152,17 +153,25 @@ if compute
     
     %% Create a cone mosaic
     %
-    % Create a cone mosaic of the appropriate size and cone density
+    % Create a cone mosaic of the appropriate size and cone density. If
+    % you're interested in modeling the optics of another species, this is
+    % the first place you would make changes. 
     switch species
         case 'treeshrew'
             theMosaic = coneMosaicTreeShrewCreate(75, ...
                 'fovDegs', sizeDegs, ...
                 'customLambda', cone_spacing);
+            theOI = oiTreeShrewCreate(...
+                'inFocusPSFsigmaMicrons', psfSigma ...
+                );
         case 'human'
             theMosaic = coneMosaicHex(7, ...
                 'eccBasedConeDensity', true, ...
                 'maxGridAdjustmentIterations',200, ...
                 'fovDegs', sizeDegs);
+            theOI = oiCreate(...
+                'inFocusPSFsigmaMicrons', psfSigma ...
+                );
         otherwise
             error('species should be treeshrew or human')
     end
@@ -302,13 +311,13 @@ if compute
         dataToSave = [species,sprintf('_csf_%.0f_trials_psf_%.0f_size_%.0f.mat',nTrialsNum,psfSigma,sizeDegs)];
     end
     %%
-    i = 1;
+    k = 1;
     
     dataToSaveTemp = dataToSave;
     
     while exist(dataToSaveTemp, 'file')
-        dataToSaveTemp = strcat('v',num2str(i),'_',dataToSave);
-        i = i + 1;
+        dataToSaveTemp = strcat('v',num2str(k),'_',dataToSave);
+        k = k + 1;
     end
     %%
     save(dataToSaveTemp,'theMosaic','contrastsTotal','accuraciesTotal','thresholdContrasts','finalAccuracy','frequencyRange','nTrialsNum','time','sizeDegs','psfSigma','integrationTime','cone_spacing','species')
@@ -343,12 +352,12 @@ minCont = min(cellfun(@(x) min(x),data.contrastsTotal));
 
 figure()
 hold on
-for i = 1:length(data.frequencyRange)
-    tempMat = [data.contrastsTotal{1,i};data.accuraciesTotal{1,i}];
+for j = 1:length(data.frequencyRange)
+    tempMat = [data.contrastsTotal{1,j};data.accuraciesTotal{1,j}];
     mat = sortrows(tempMat');
     color = rand(1,3);
     plot(mat(:,1),mat(:,2),'LineWidth',2,'color',color)
-    plot(data.thresholdContrasts(i),data.finalAccuracy(i),'*','MarkerSize',10,'color',color)
+    plot(data.thresholdContrasts(j),data.finalAccuracy(j),'*','MarkerSize',10,'color',color)
 end
 
 if maxCont > .031
@@ -368,4 +377,53 @@ xlabel('\it Contrast (Michelson)');
 ylabel('\it SVM Accuracy');
 title('Psychometric Function Approximations')
 hold off
+end
+
+function plotCSF(data,expData,toDivide)
+
+% Shifting the sensitivity downwards by a factor of 'toDivide', if desired
+sensitivity = (1./data.thresholdContrasts)./toDivide;
+
+plotTitle = sprintf('CSF \n %.0f trials, sigma_{PSF} = %.0f, mosaic size = %.0f',data.nTrialsNum,data.psfSigma,data.sizeDegs);
+
+figure()
+
+plot(data.frequencyRange , sensitivity/toDivide,'b.-','MarkerSize',20)
+
+% If you want to plot data from Casagrande 1984:
+if expData 
+    hold on
+    load ts_CSF_M.mat ts_CSF_M
+
+    ts1 = ts_CSF_M{1};
+    ts2 = ts_CSF_M{2};
+    ts3 = ts_CSF_M{3};
+
+    plot(ts1(:,1),ts1(:,2),'k.-')
+    plot(ts2(:,1),ts2(:,2),'kx-')
+    plot(ts3(:,1),ts3(:,2),'ko-')
+    
+    legend('ISETTreeShrew CSF','Casagrande TS0','Casagrande TS1','Casagrande TS3','Location','northwest')
+end
+
+set(gca,'ylim',[0,max(sensitivity/toDivide)])
+
+if max(data.frequencyRange) > 2
+    set(gca,'xlim',[.1,max(data.frequencyRange)])
+    contrastTicks = [0.1 0.2 0.5 1.0 2.0, max(data.frequencyRange) ];
+    contrastTickLabels = {'.1', '.2', '.5', '1', '2', sprintf('%.0f',max(data.frequencyRange))};
+else
+    set(gca,'xlim',[.1,2])
+    contrastTicks = [0.1 0.2 0.5 1.0 2.0 ];
+    contrastTickLabels = {'.1', '.2', '.5', '1', '2'};
+end
+    set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
+set(gca, 'XScale', 'log')
+set(gca, 'YScale', 'log')
+set(gca, 'FontSize', 16)
+xlabel('\it Spatial Frequency (Cycles/Degree)');
+ylabel('\it Contrast Sensitivity');
+title(plotTitle)
+end
+
 end

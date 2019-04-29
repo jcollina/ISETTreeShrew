@@ -1,5 +1,6 @@
 function plotCSF(data,varargin)
-% Plot the CSF for an optical system
+% Plot the contrast sensitivity function for a given simulated visual
+% system front-end.
 %
 % Syntax:
 %   plotCSF(data,'toDivide','20','expData','TRUE')
@@ -7,14 +8,17 @@ function plotCSF(data,varargin)
 % Inputs:
 %   data        Matlab structure with fields 'thresholdContrasts',
 %               'frequencyRange', 'nTrialsNum', 'psfSigma' and 'sizeDegs'
-%   toDivide    Factor to shift sensitivity function downwards, if desired
-%   expData     Plot Casagrande's experimental data? 'TRUE' or 'FALSE'
+%
+% Optional key/value pairs:
+%   toDivide - Factor to shift sensitivity function downwards, if desired
+%   expData - Plot Casagrande's experimental data? 'TRUE' or 'FALSE'
 
 % See also:
 %   t_BinarySearchCSF
 
 % History:
 %   04/08/19 jsc  Wrote initial version.
+%   04/28/19 jsc  Formatted.
 
 p = inputParser;
 p.addParameter('toDivide', 1 , @isnumeric);

@@ -6,7 +6,7 @@
 		"localHookTemplate": "configuration/ISETTreeShrewLocalHookTemplate.m",
 		"name": "ISETTreeShrewCode",
 		"pathPlacement": "append",
-		"subfolder": ["toolbox", "tutorials", "compute", "validations"],
+		"subfolder": ["toolbox", "tutorials", "compute", "data", "validations"],
 		"toolboxRoot": "",
 		"type": "git",
 		"update": "",

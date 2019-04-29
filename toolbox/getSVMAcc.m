@@ -1,63 +1,71 @@
-function [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene, varargin)
+function [percentCorrect,time] = getSVMAcc(theMosaic, theOI, testScene, nullScene, varargin)
 % Calculate the accuracy of an SVM trained to discriminate between a test
-% stimulus and a null stimulus using a given cone mosaic.
+% stimulus and a null stimulus using a given cone mosaic and optical
+% structure.
 %
 % Syntax:
-%   [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene, varargin)
+%   [percentCorrect,time] = getSVMAcc(theMosaic, testScene, nullScene)
 %
-
-% Optional arguments:
-% nTrialsNum:   Number of iterations to be trained upon
-% species:      'treeshrew' or 'human' optics?
-% nFolds:       How many folds to be used in k-fold validation?
-% psfSigma:     For the optics, what's the spread of the point-spread
-%               function?
+% Input:
+%    theMosaic              An object of class 'coneMosaic'
+%    theOI                  An optical image structure
+%    testScene              An scene structure
+%    nullScene              Scene to be compared against testScene
+%
+% Output:
+%     percentCorrect        Vector of length 'nFolds' containing accuracy of
+%                           each validation, in units of percent, total 
+%                           accuracy computed by averaging this vector   
+%     time                  Amount of time taken to run the SVM, in seconds
+%
+% Optional key/value pairs:
+%     'nTrialsNum'          Number of trial iterations to be trained upon 
+%                           (default 250)
+%      'nFolds'             Number of folds for validation (default 10)
+%      'taskIntervals'      Number of task intervals:
+%                           2 (default) - The 'subject' is shown both scenes 
+%                           for each trial, and is asked to determine which 
+%                           scene is the test scene
+%                           1 - The 'subject' is shown both scenes at the 
+%                           beginning of the task, and a trial consists of
+%                           the subject being shown one scene and asked to
+%                           determine which scene it is
+%
+% See Also:
+%   coneMosaic
+%   oiCreate
+%   sceneCreate
+%
+% History:
+%   02/08/19  jsc drafted
+%   04/26/19  jsc formatted 
 
 p = inputParser;
 p.addParameter('nTrialsNum', 250, @isnumeric);
-p.addParameter('species', 'treeshrew', @ischar);
 p.addParameter('nFolds', 10, @isnumeric);
-p.addParameter('psfSigma', 7, @isnumeric);
+p.addParameter('taskIntervals', 2, @isnumeric);
 
 % Parse input
 p.parse(varargin{:});
-
-psfSigma = p.Results.psfSigma;
 nFolds = p.Results.nFolds;
 nTrialsNum = p.Results.nTrialsNum;
-species = p.Results.species;
+taskIntervals = p.Results.taskIntervals;
 
 tic;
 
-emPathLength = 1;
-taskIntervals = 2;
 emPath = zeros(nTrialsNum, emPathLength, 2);
 
-% Generate wavefront-aberration derived ts optics
-switch species
-    case 'treeshrew'        
-        theOI = oiTreeShrewCreate(...
-            'inFocusPSFsigmaMicrons', psfSigma ...
-            );
-    case 'human'
-        theOI = oiCreate(...
-            'inFocusPSFsigmaMicrons', psfSigma ...
-            );
-    otherwise
-        error('species should be treeshrew or human')
-end
 % Compute the retinal image of the test stimulus
-theTestOI = oiCompute(theOI, testScene);
+testOI = oiCompute(theOI, testScene);
 
 % Compute the retinal image of the null stimulus
-theNullOI = oiCompute(theOI, nullScene);
+nullOI = oiCompute(theOI, nullScene);
 
-%
 % Compute mosaic excitation responses to the test stimulus
-coneExcitationsTest = theMosaic.compute(theTestOI, 'emPath', emPath);
+coneExcitationsTest = theMosaic.compute(testOI, 'emPath', emPath);
 
 % Compute mosaic excitation responses to the null stimulus
-coneExcitationsNull = theMosaic.compute(theNullOI, 'emPath', emPath);
+coneExcitationsNull = theMosaic.compute(nullOI, 'emPath', emPath);
 
 % Obtain the indices of the grid nodes that contain cones
 [~,~,~, nonNullConeIndices] = theMosaic.indicesForCones;
@@ -76,7 +84,6 @@ nullResponses = reshape(nullResponses, [nTrials responseSize]);
 
 % Form the classification matrix.
 
-%
 if (taskIntervals == 1)
     % In the one interval task, the null and test response instances are labelled as the 2 classes.
     % Allocate matrices
@@ -89,7 +96,7 @@ if (taskIntervals == 1)
     classificationMatrix(nTrials+(1:nTrials),:) = testResponses;
     classes(nTrials+(1:nTrials)) = 1;
 elseif (taskIntervals == 2)
-    % In the two inteval task, we concatenate [null test] as one class and [test null] as the other.
+    % In the two interval task, we concatenate [null test] as one class and [test null] as the other.
     % Allocate matrices
     classificationMatrix = nan(nTrials, 2*responseSize);
     classes = nan(nTrials, 1);
@@ -110,7 +117,7 @@ else
 end
 
 % Find principal components of the responses
-[pcVectors, ~, ~, ~, ~] = pca(classificationMatrix);
+pcVectors = pca(classificationMatrix);
 
 % Project the responses onto the space formed by the first 2 PC vectors
 pcComponentsNum = 2;
@@ -119,16 +126,15 @@ classificationMatrixProjection = classificationMatrix * pcVectors(:,1:pcComponen
 % Train a binary SVM classifier
 svm = fitcsvm(classificationMatrixProjection,classes);
 
-% Perform a 10-fold cross-validation on the trained SVM model
+% Perform a k-fold cross-validation on the trained SVM model
 CVSVM = crossval(svm,'KFold',nFolds);
 
 % Compute classification loss for the in-sample responses using a model
 % trained on out-of-sample responses
-%
 fractionCorrect = 1 - kfoldLoss(CVSVM,'lossfun','classiferror','mode','individual');
-%
-% Percent correct across all folds
-percentCorrect = fractionCorrect.*100;%mean(fractionCorrect) * 100;
+
+% Calculate percent correct for each fold
+percentCorrect = fractionCorrect.*100;
 
 time = toc;
 
