@@ -1,22 +1,21 @@
-function t_psychometricFromBinarySearch
+function t_psychometricFromBinarySearch(varargin)
 %% t_psychometricFromBinarySearch (Human/Treeshrew)
 % In Casagrande's 1984 treeshrew CSF paper, the researchers fit their data
 % of contrast vs accuracy with a psychometric function, and used it to find
 % their desired contrast threshold.
 %
 % In ISETBio, we don't have an a priori idea of the threshold location, so
-% we set a wide contrast range to search. If we plotted evenly spaced
-% points over this range, we would be unlike to sample the accuracies
-% between ceiling and randomness, at least not enough to provide evidence
-% for a psychometric function fit. Instead, we use a binary search
+% we set a wide contrast range to search. If we evenly sampled the full
+% range, we would need a very large number of data points in order to fully
+% sample the psychometric function. Instead, we use a binary search
 % algorithm to find the desired contrast threshold, as can be seen in
 % t_BinarySearchCSF.
 %
 % Nevertheless, we assume that there is an underlying psychometric
 % function. And once we've found the contrast threshold, we can sample
 % around that threshold and fit the local data to a psychometric function,
-% proving that our binary search does, in fact, locate the correct contrast
-% values.
+% proving that our binary search does, in fact, approximate the correct
+% contrast values.
 
 % See also: t_BinarySearchCSF
 %
@@ -29,20 +28,61 @@ function t_psychometricFromBinarySearch
 
 % Load dataset created using t_BinarySearchCSF. Data must have the
 % variables:
-%       sizeDegs
 %       theMosaic
+%       theOI
 %       nTrialsNum
 %       psfSigma
-%       contrastsTotal
-%       frequencyRange
+%       binaryResults: struct w/
+%           contrastsTotal
+%           frequencyRange
 
-% Load the dataset, choosing the name that matches your simulated data
-data = load('2cd_max_csf_1000_trials_psf_12_size_5.mat');
+% What data do you want to use? This would be overwritten by function
+% input.
 
-sizeDegs = data.sizeDegs;
-theMosaic = data.theMosaic;
-nTrialsNum = data.nTrialsNum;
-psfSigma = data.psfSigma;
+data = load('sampleCSFData.mat');
+
+% Parse optional input from function
+p = inputParser;
+p.StructExpand = false;
+p.addParameter('csfData', data, @isstruct)
+p.addParameter('psychData', struct, @isstruct)
+p.addParameter('dataName', char.empty, @ischar)
+p.addParameter('overwrite', false, @islogical)
+
+p.parse(varargin{:});
+data = p.Results.csfData;
+psychData = p.Results.psychData;
+dataName = p.Results.dataName;
+overwrite = p.Results.overwrite;
+
+% Load a previously generated set of data, if indicated.
+
+% Assume that we are creating a new dataset, unless indicated otherwise by
+% passing a previously created psych dataset into the function.
+compute = true;
+
+% Load a previously generated set of data, if indicated.
+if ~ismember('psychData',p.UsingDefaults)
+    compute = false;
+    if ~isempty(dataName)
+        warning('You are loading data instead of generating new data, so no new data will be saved under your chosen name.')
+    end
+end
+
+if ~ismember('csfData',p.UsingDefaults) && compute == false
+    error('Either choose a psychometric function data structure to plot, or create one from binary search data.')
+end
+
+
+nTrialsNum = data.expInfo.nTrialsNum;
+nFolds = 10;%data.expInfo.nFolds;
+
+%sizeDegs = round(theMosaic.fov);
+
+% All we need now is the results of the binary search
+%data = data.binaryResults;
+
+%}
 
 %% Selecting spatial frequency to use
 %
@@ -54,129 +94,81 @@ psfSigma = data.psfSigma;
 %       three unique values, so that we get an idea of the slope of the
 %       psychometric function, not just a single point.
 
-minSteps = 8;
+%We don't want to sample the entire field, and want to take advantage of
+%the binary search we've already done. How many steps do we want to take
+%before deciding we're close enougn to the threshold?
 
-j = 1;
-while 1
-    a = data.contrastsTotal{1,j};
-    if length(a) > minSteps
-        thresholdContrastsTemp = round(a(length(a)-4:length(a)),4);
-        if length(unique(thresholdContrastsTemp)) > 3
-           thresholdContrasts = unique(thresholdContrastsTemp);
-           break;
-        end
-    end
-    j = j+1;    
-end
+% 1 : 1/2 of the original contrast range
+% 2 : 1/4 of the original contrast range
+% ...
+stepsBeforePlotting = 3;
 
-spatFreq = data.frequencyRange(j);
+% What's the minimum number of unique points you want to sample?
+minInputPoints = 5;
 
-%contrastsTemp(length(contrastsTemp) - ...
-%    numSearchPoints:length(contrastsTemp));
+% What's the range of satisfactory accuracies you want to have reached in the original
+% search?
+accRange = [74.5,75.5];
 
-minC = min(thresholdContrasts);
-maxC = max(thresholdContrasts);
+% How many points within the threshold range do you want to
+% compute?
+numOutputPoints = 5;
 
-numSamplePoints = 5;
+% How many points outside the threshold range would you like to compute?
+% These will be evenly spaced, spanning the range of contrasts searched.
+numOtherPoints = 5;
 
-thresholdSamples = minC:(maxC-minC)/numSamplePoints:maxC;
+if compute
 
-contrastsToPlot = sort([.001,.005,.01,.015,.02,.03,thresholdSamples]);
-
-%% Using SVM to calculate accuracy for each contrast
-
-% Size of testing set, based on 10-fold cross-evaluation
-
-% Create presentation display
-presentationDisplay = displayCreate('LCD-Apple', 'viewing distance', 20/100);
-
-% Create parameter structure for a low spatial frequency Gabor stimulus
-stimParams = struct(...
-    'spatialFrequencyCyclesPerDeg', data.frequencyRange(j), ...  % changing cycles/deg
-    'orientationDegs', 0, ...               % 0 degrees
-    'phaseDegs', 90, ...                    % spatial phase degrees, 0 = cos, 90 = sin
-    'sizeDegs', data.sizeDegs, ...          % size
-    'sigmaDegs', 100, ...                   % sigma of Gaussian envelope
-    'meanLuminanceCdPerM2', 35, ...         % 35 cd/m2 mean luminance
-    'pixelsAlongWidthDim', [], ...          % pixels- width dimension
-    'pixelsAlongHeightDim', [] ...          % pixel- height dimension
-    );
-
-% Generate null scene (contrast = 0)
-stimParams.contrast = 0.0;
-
-nullScene = generateGaborScene(...
-    'stimParams', stimParams,...
-    'presentationDisplay', presentationDisplay);
-
-accuraciesToPlot = zeros(1,length(contrastsToPlot));
-
-% Cycle through contrasts, using the SVM to calculate accuracy for each. 
-
-fprintf('Progress:\n');
-fprintf(['\n' repmat('.',1,length(contrastsToPlot)) '\n\n']);
-
-parfor i = 1:length(contrastsToPlot)
-    stimParams = struct(...
-        'spatialFrequencyCyclesPerDeg', spatFreq, ...  % changing cycles/deg
-        'orientationDegs', 0, ...               % 0 degrees
-        'phaseDegs', 90, ...                    % spatial phase degrees, 0 = cos, 90 = sin
-        'sizeDegs', sizeDegs, ...               % size
-        'sigmaDegs', 100, ...                   % sigma of Gaussian envelope
-        'meanLuminanceCdPerM2', 35, ...         % 35 cd/m2 mean luminance
-        'pixelsAlongWidthDim', [], ...          % pixels- width dimension
-        'pixelsAlongHeightDim', [] ...          % pixel- height dimension
+    sampledData = sampleThresholdBinarySearch(data, ...
+        'stepsBeforePlotting',stepsBeforePlotting, ...
+        'accRange',accRange, ...
+        'minInputPoints',minInputPoints, ...
+        'numOtherPoints',numOtherPoints, ...
+        'numOutputPoints',numOutputPoints ...
         );
+
+    % Fit the data with a psychometric function
+    psychFitResults = getPsychometricFit(sampledData.contrasts,sampledData.accuracies, nTrialsNum/nFolds ,'accThreshold',mean(accRange));
+    % contrasts, accuracies, threshold, ntrials
+    % Save the data, including the results of the fit
     
-    % Set the contrast level for this iteration
-    stimParams.contrast = contrastsToPlot(i);
+    if isempty(dataName)
+        psychDataToSave = [species,sprintf('psychFn_%.0f_trials.mat',nTrialsNum)];
+    elseif endsWith(dataName,'.mat')
+        psychDataToSave = dataName;
+    else
+        psychDataToSave = strcat(dataName,'.mat');
+    end
     
-    % Generate a Gabor patch with that contrast
-    testScene = generateGaborScene(...
-        'stimParams', stimParams,...
-        'presentationDisplay', presentationDisplay,...
-        'minimumPixelsPerHalfPeriod', 5);
+    % Will the data be overwritten?
+    if ~overwrite
+        k = 1;
+        psychDataToSaveTemp = psychDataToSave;
+        while exist(psychDataToSaveTemp, 'file')
+            psychDataToSaveTemp = strcat('v',num2str(k),'_',psychDataToSave);
+            k = k + 1;
+        end
+        psychDataToSave = psychDataToSaveTemp;
+    end
     
-    % Determine how well the specified optics can discriminate between that
-    % patch and a null stimulus
-    [acc,~] = getSVMAcc(theMosaic, testScene, nullScene, 'nTrialsNum',nTrialsNum,'psfSigma',psfSigma);%,'species',species);
-    accuraciesToPlot(i) = mean(acc);
-    fprintf('\b|\n');    
+    thresholdSample.frequency = spatFreq;
+    thresholdSample.contrastsTotal = contrastsToFit;
+    thresholdSample.accuraciesTotal = accuraciesToFit;
+    thresholdSample.totalSE = acc_SE;
+    
+    save(psychDataToSave,'nTrialsNum','thresholdSample','psychFitResults')
+else
+    thresholdSample = psychData.thresholdSample;
+    psychFitResults = psychData.psychFitResults;
 end
+
 %% Psychometric function fit implementation
 %
-% Fit the data with a psychometric function
-[contrastThreshold,hiResContrasts,hiResPerformance] = getPsychometricFit(contrastsToPlot,accuraciesToPlot/100,nTrialsNum/10);
-
-% Then, plot the simulated data, the psychometric function, and the
-% reported contrast threshold
-plotPsychometricFunction(hiResContrasts,hiResPerformance,contrastsToPlot,accuraciesToPlot,contrastThreshold,spatFreq)
+% Plot the simulated data, the psychometric function, and the reported contrast threshold
+plotPsychometricFunction(thresholdSample,psychFitResults)
 
 %% Functions
-function plotPsychometricFunction(hiResContrasts,hiResPerformance,contrastsToPlot,accuraciesToPlot,contrastThreshold,spatFreq)
-figure()
-plot(hiResContrasts,100*hiResPerformance, 'r-', 'LineWidth', 1.5);
-hold on
-plot(contrastsToPlot,accuraciesToPlot, 'ko', 'MarkerSize', 8, ...
-    'MarkerFaceColor', [0.5 0.5 0.5], 'MarkerEdgeColor', [0 0 0]);
-line([contrastThreshold,contrastThreshold],[40,75])
-line([min(contrastsToPlot),contrastThreshold],[75,75])
-if max(contrastsToPlot) > .031
-    set(gca,'xlim',[min(contrastsToPlot),max(contrastsToPlot)])
-    contrastTicks = [0.005,0.01 0.02 0.03, max(contrastsToPlot) ];
-    contrastTickLabels = {'0.005','.01', '.02', '.03', int2str(round(maxContrastsToPlot))};
-else
-    set(gca,'xlim',[min(contrastsToPlot),.03])
-    contrastTicks = [0.005 0.01 0.02 0.03];
-    contrastTickLabels = {'0.005', '.01',  '.02',  '.03'};
-end
-set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
-set(gca, 'YLim', [40 105], 'XScale', 'log')
-set(gca, 'FontSize', 16)
-xlabel('\it Contrast (Michelson)');
-ylabel('\it SVM Accuracy');
-title(sprintf('Individual Psychometric Function for\nSpatial Frequency of %.0f cpd',spatFreq))
-hold off
-end
+    
 
 end

@@ -1,4 +1,4 @@
-function [percentCorrect,time] = getSVMAcc(theMosaic, theOI, testScene, nullScene, varargin)
+function [percentCorrect,trialsPerFold,time] = getSVMAcc(theMosaic, theOI, testScene, nullScene, varargin)
 % Calculate the accuracy of an SVM trained to discriminate between a test
 % stimulus and a null stimulus using a given cone mosaic and optical
 % structure.
@@ -16,12 +16,14 @@ function [percentCorrect,time] = getSVMAcc(theMosaic, theOI, testScene, nullScen
 %     percentCorrect        Vector of length 'nFolds' containing accuracy of
 %                           each validation, in units of percent, total 
 %                           accuracy computed by averaging this vector   
+%     trialsPerFold         Number of trials per fold for the accuracy
 %     time                  Amount of time taken to run the SVM, in seconds
 %
 % Optional key/value pairs:
 %     'nTrialsNum'          Number of trial iterations to be trained upon 
 %                           (default 250)
 %      'nFolds'             Number of folds for validation (default 10)
+%      'emPathN'             Number of steps of eye movement (default 1)
 %      'taskIntervals'      Number of task intervals:
 %                           2 (default) - The 'subject' is shown both scenes 
 %                           for each trial, and is asked to determine which 
@@ -44,16 +46,20 @@ p = inputParser;
 p.addParameter('nTrialsNum', 250, @isnumeric);
 p.addParameter('nFolds', 10, @isnumeric);
 p.addParameter('taskIntervals', 2, @isnumeric);
+p.addParameter('emPathN', 1, @isnumeric);
+
 
 % Parse input
 p.parse(varargin{:});
 nFolds = p.Results.nFolds;
 nTrialsNum = p.Results.nTrialsNum;
 taskIntervals = p.Results.taskIntervals;
+emPathN = p.Results.emPathN;
 
 tic;
 
-emPath = zeros(nTrialsNum, emPathLength, 2);
+% Generate various instances of eye movement paths (zero movement of emPathN = 1)
+emPath = zeros(nTrialsNum, emPathN, 2);
 
 % Compute the retinal image of the test stimulus
 testOI = oiCompute(theOI, testScene);
@@ -135,6 +141,8 @@ fractionCorrect = 1 - kfoldLoss(CVSVM,'lossfun','classiferror','mode','individua
 
 % Calculate percent correct for each fold
 percentCorrect = fractionCorrect.*100;
+
+trialsPerFold = nTrialsNum/nFolds;
 
 time = toc;
 
