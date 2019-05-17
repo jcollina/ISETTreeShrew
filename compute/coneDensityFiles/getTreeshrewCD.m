@@ -1,5 +1,5 @@
 
-function [leftAngTS,rightAngTS,uniqueVisualAnglesTS,leftConeDensityTS,rightConeDensityTS, tsCD] = getTreeshrewCD(ts_choose,useTheorFL,returnShift)
+function [leftAngTS,rightAngTS,uniqueVisualAnglesTS,leftConeDensityTS,rightConeDensityTS, tsCD] = getTreeshrewCD(ts_choose,fl,returnShift)
 
 % In Muller's 1989 TS Topography Paper, Figure 5 shows the cone density
 % maps for 3 separate treeshrew retinas. Out of retinas 'A', 'B' and 'C',
@@ -21,13 +21,13 @@ ts_AL = 7.8; %mm
 %do you want to use data that has been gathered about the treeshrew focal
 % length, and see what field of view is returned? Or do you want to find
 % the focal length that explains a hypothesis about the field of view?
-useTheorFL = true;
 
 % If you just want to use the PND used in Jarvis et al, 2003, and see what
 % FOV emerges:
 
-ts_FL_exp = 5.81; %mm 
+ts_FL_exp = fl;%5.81; %mm 
 
+useTheorFL = false;
 %Question: do we want to use the anterior or posterior focal lengths?
 % so: 4.35 mm or 5.81 mm?
 
