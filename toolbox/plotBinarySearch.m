@@ -23,16 +23,32 @@ minCont = min(cellfun(@(x) min(x),binaryResults.contrasts));
 figure()
 hold on
 
+color = zeros(length(binaryResults.frequencyRange),3);
+for i = 1:length(binaryResults.frequencyRange)
+    color(i,:) = rand(1,3);
+end
+
+dataLen = length(binaryResults.frequencyRange);
+
+C = {'r',[1 0.5 0],'y','g','b','c','m'};
+if dataLen > 6
+    Ctemp = cell([1 dataLen - 6]);
+    for i = 1 : dataLen - 6
+        Ctemp{i} = rand(1,3);
+    end
+    C = [C Ctemp];
+end
+
+
 % Plot the individual search points and their corresponding SVM accuracy
 for j = 1:length(binaryResults.frequencyRange)
     tempMat = [binaryResults.contrasts{1,j};binaryResults.accuracies{1,j}];
     mat = sortrows(tempMat');
-    color = rand(1,3);
-    plot(mat(:,1),mat(:,2),'LineWidth',2,'color',color)
-    
+    plot(mat(:,1),mat(:,2),'LineWidth',2,'color',C{j})
     % Use the SE from the SVM results as an error bar for the final
     % accuracy
-    errorbar(binaryResults.thresholdContrasts(j),binaryResults.finalAccuracy(j), binaryResults.finalSE(j),'k*','MarkerSize',10)%,'color',color)
+    errorbar(binaryResults.thresholdContrasts(j),binaryResults.finalAccuracy(j), binaryResults.finalSE(j),'k.','MarkerSize',10)
+    text(binaryResults.thresholdContrasts(j)*1.05,binaryResults.finalAccuracy(j),['f = ' num2str(binaryResults.frequencyRange(j)) newline ' cpd'])
 end
 
 % Expand the x-axis if the max contrast is higher than 0.03
@@ -53,8 +69,8 @@ set(gca, ...
     'FontSize', 16 ...
     );
 
-xlabel('\it Contrast (Michelson)');
-ylabel('\it SVM Accuracy');
+xlabel('Contrast (Michelson)');
+ylabel('Performance (% Accuracy)');
 title(['Psychometric Function Approximations' newline 'Using a Binary Search']);
 
 hold off

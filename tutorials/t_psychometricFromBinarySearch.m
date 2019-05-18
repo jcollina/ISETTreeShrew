@@ -1,6 +1,16 @@
 function t_psychometricFromBinarySearch(varargin)
 %
 %% t_psychometricFromBinarySearch (Human/Treeshrew)
+% Use sampledThresholdBinarySearch, getPsychometricFit amd plotPsychometricFunction 
+% to confirm that binay searches actually estimate the threshold
+
+% Syntax:
+%   t_psychometricFromBinarySearch('csfData','load('bestCSFData.mat'))
+%   t_BinarySearchCSF('dataName','bestDataEver')
+%   t_BinarySearchCSF('csfDataToPlot',load('treeshrew_csf_250_trials.mat'))
+%
+
+% Description:
 % In Casagrande's 1984 treeshrew CSF paper, the researchers fit their data
 % of contrast vs accuracy with a psychometric function, and used it to find
 % their desired contrast threshold.
@@ -18,6 +28,17 @@ function t_psychometricFromBinarySearch(varargin)
 % proving that our binary search does, in fact, approximate the correct
 % contrast values.
 
+% Optional key/value pairs:
+%   csfData - Binary search data (structure)
+%   psychData - Previously gathered psychometric function data, if you just
+%       want to plot (structure)
+%   dataName - If you have a specific choice for the name of the generated
+%       data, you can input dataName as a character array.
+%   overwrite - If there is already a dataset with the same name, do you
+%       want to overwrite it? true/false.
+%   saveToWS - If you're just exploring the code, you may want to save the
+%       generated data to the workspace after it is created. Logical.
+
 % See also: t_BinarySearchCSF
 %
 
@@ -28,8 +49,8 @@ function t_psychometricFromBinarySearch(varargin)
 % History:
 %   04/02/19 jsc  Wrote initial version.
 
-% Required dataset can be created using t_BinarySearchCSF. Data must have the
-% variables:
+% Required csfData dataset can be created using t_BinarySearchCSF. Data must
+% have the variables:
 %       species
 %       expInfo: struct w/
 %           theMosaic
@@ -45,7 +66,7 @@ function t_psychometricFromBinarySearch(varargin)
 % What data do you want to use? This could be overwritten by function
 % input.
 
-data = load('sampleCSFData.mat');
+data = load('sampleCSFResults.mat');
 
 % Parse optional input from function
 p = inputParser;
@@ -98,11 +119,11 @@ stepsBeforePlotting = 3;
 
 % What's the minimum number of unique points you want to sample? So, the
 % points after the previous parameter.
-minInputPoints = 5;
+minInputPoints = 2;
 
 % What's the range of satisfactory accuracies you want to have reached in the original
 % search?
-accRange = [74.5,75.5];
+acceptedAccRange = [74.5,75.5];
 
 % How many points within the threshold range do you want to
 % compute?
@@ -126,9 +147,11 @@ if compute
     %
     % Determine number of data points used to compute each accuracy
     % measure
-    nTrialsPerMeasure = data.expInfo.nTrialsNum/data.expInfo.nFolds;
+    expInfo = data.expInfo;
+    nTrialsNum = expInfo.nTrialsNum;
+    nTrialsPerMeasure = nTrialsNum/expInfo.nFolds;
     % Fit the data
-    psychFitResults = getPsychometricFit(thresholdSample.contrasts,thresholdSample.accuracies, nTrialsPerMeasure ,'accThreshold',mean(accRange));
+    psychFitResults = getPsychometricFit(thresholdSample.contrasts,thresholdSample.accuracies, nTrialsPerMeasure ,'accThreshold',mean(acceptedAccRange));
     
     %% Save the data, including the results of the fit
     
@@ -158,7 +181,7 @@ if compute
         psychDataToSave = psychDataToSaveTemp;
     end
     
-    save(psychDataToSave,'nTrialsNum','thresholdSample','psychFitResults')
+    save(psychDataToSave,'expInfo','thresholdSample','psychFitResults')
 else
     % If you passed in a previously gathered dataset with the proper fields,
     % we'll expand that here.

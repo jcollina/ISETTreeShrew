@@ -1,8 +1,9 @@
 function t_BinarySearchCSF(varargin)
 %
 %% t_BinarySearchCSF (Human/Treeshrew)
-% Use a binary SVM and binary search algorithm to create a contrast
-% sensitivity function.
+% Use binarySearchOverFeature, plotBinarySearch and plotCSF to generate a
+% contrast sensitivity function.
+
 %
 % Syntax:
 %   t_BinarySearchCSF()
@@ -39,17 +40,6 @@ function t_BinarySearchCSF(varargin)
 %       The steps involved in the binary search process are well-described
 %       in https://en.wikipedia.org/wiki/Binary_search_algorithm.
 %
-%       Because there is some variability in the SVM results, it is
-%       possible for the binary search algorithm to focus on the wrong
-%       contrast, without reaching the desired accuracy. For 1000 trials
-%       and 10 folds, the SVM results usually have a standard error between
-%       1% and 2%. We approach this problem by setting a maximum number of
-%       iterations. If that number of iterations is reached without the
-%       desired contrast being found, then the code checks for the contrast
-%       that led to an accuracy closest to 75%. If 75% falls within a 95%
-%       CI for that SVM, then we use that contrast as our "threshold
-%       contrast" and move on to the next spatial frequency.
-%
 %   3) Calculate the contrast sensitivity at each spatial frequency by
 % taking the reciprocal of the threshold contrast.
 %
@@ -61,7 +51,9 @@ function t_BinarySearchCSF(varargin)
 %   dataName - If you have a specific choice for the name of the generated
 %       data, you can input dataName as a character array.
 %   overwrite - If there is already a dataset with the same name, do you
-%   want to overwrite it? true/false.
+%       want to overwrite it? true/false.
+%   saveToWS - If you're just exploring the code, you may want to save the
+%       generated data to the workspace after it is created. Logical.
 
 % Tools used:
 %   binarySearchOverContrast
@@ -115,7 +107,7 @@ sizeDegs = 5; % degrees per side
 % sensitivities for? The Casagrande paper showed a treeshrew CSF
 % dropoff in the range of 0.75 - 2 cycles/degree, while for humans it
 % is in the range of 1 - 10 cycles/degree.
-frequencyRange = 0.75:0.25:2; %cycles per degree
+frequencyRange = 0.75;%:0.25:2; %cycles per degree
 
 % What range of contrasts do you want to explore for the spatial
 % frequencies? Make it wide enough to include accuracies other than
@@ -143,7 +135,7 @@ toDivide = 20;
 %% SVM Specifications:
 
 % How much data do you want to use to train the SVM?
-nTrialsNum = 500;
+nTrialsNum = 50;
 
 % How many folds do you want to use for cross-validation?
 nFolds = 10;
@@ -223,25 +215,18 @@ if compute
             
     end
     
-    %{
-    'fovDegs', sizeDegs);
-    
-    theOI = speciesOI(species,'inFocusPSFsigmaMicrons', psfSigma);
-    
-    theMosaic = speciesMosaic(species, 75, ...
-                'fovDegs', sizeDegs, ...
-                'customLambda', cone_spacing);
-    %}
-    
     %% Set stimulus parameters and display type to default for the csf experiment
     [stimParams,presentationDisplay] = csfStimParamsDefault();
+    
+    % We don't need the default contrast or frequency, because
+    % we will set the frequency and find a contrast based on it
+    stimParams = rmfield(stimParams,{'contrast','spatialFrequencyCyclesPerDeg'});
     stimParams.sizeDegs = sizeDegs;
     
     %% Main loop
     %
     % Begin looping over the discrete spatial frequencies chosen
-    T = tic;
-    
+
     % Matlab generates warnings when you create variables during parallel
     % for loops, so we suppress this specific warning during the loop.
     %warning('off','MATLAB:mir_warning_maybe_uninitialized_temporary')
@@ -251,8 +236,10 @@ if compute
     
     D = parallel.pool.DataQueue;
     
-    h = waitbar(0, 'Progress');
+    w = waitbar(0, 'Progress');
     afterEach(D, @nUpdateWaitbar);
+    
+    T = tic;
     
     parfor i = 1:length(frequencyRange)
         
@@ -261,8 +248,9 @@ if compute
         
         %% Binary Search
         
-        % Start search
-        searchResults = binarySearchOverContrast(...
+        % Perform the search, using the binarySearchOverContrast function
+        searchResults = binarySearchOverFeature(...
+            'contrast', ...
             contrastRange, ...
             theMosaic, ...
             theOI, ...
@@ -275,10 +263,10 @@ if compute
             );
         
         % Save variables
-        contrastsTotal{1,i} = searchResults.contrasts;
-        accuraciesTotal{1,i} = searchResults.accuracies;
-        thresholdContrasts(1,i) = searchResults.thresholdContrast;
-        finalAccuracy(1,i) = searchResults.finalAcc;
+        contrastsTotal{1,i} = searchResults.samples;
+        accuraciesTotal{1,i} = searchResults.performances;
+        thresholdContrasts(1,i) = searchResults.thresholdFeature;
+        finalAccuracy(1,i) = searchResults.finalAccuracy;
         finalSE(1,i) = searchResults.finalSE;
         
         send(D,i)
@@ -286,7 +274,7 @@ if compute
     end
     
     delete(gcp)
-    close(h)
+    close(w)
     
     time = toc(T)/60;
     disp(['The binary search took ', num2str(time), ' minutes.'])
@@ -321,7 +309,7 @@ if compute
     expInfo.psfSigma = psfSigma;
     
     expInfo.nTrialsNum = nTrialsNum;
-    expInfo.nTrialsNum = nFolds;
+    expInfo.nFolds = nFolds;
     
     binaryResults.frequencyRange = frequencyRange;
     binaryResults.contrastRange = contrastRange;
@@ -370,7 +358,7 @@ plotCSF(binaryResults, 'expInfo', expInfo, 'toDivide', toDivide, 'plotCasagrande
 %% Functions
 
     function nUpdateWaitbar(~)
-        waitbar(count/N, h);
+        waitbar(count/N, w);
         count = count + 1;
     end
 

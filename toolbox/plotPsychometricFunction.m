@@ -72,7 +72,7 @@ set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
 set(gca, 'YLim', [40 105], 'XScale', 'log')
 set(gca, 'FontSize', 16)
 xlabel('Contrast (Michelson)');
-ylabel('% SVM Accuracy');
-title(sprintf('Individual Psychometric Function for\nSpatial Frequency of %.0f cpd',spatFreq))
+ylabel('Performance (% Detected)');
+title('Individual Psychometric Function')
 hold off
 end

@@ -1,12 +1,13 @@
 function [stimParamsDefault, displayDefault] = csfStimParamsDefault(~)
-% Creates the default stimulus parameters for the gabor patches used in
+% Creates a default stimulus parameters for the gabor patches used in
 % Casagrande's 1984 tree shrew paper (except smaller, Casagrande used 16
 % degree patches). Vertical stripes, no overlaid gaussian (or: very large
-% gaussian width), and a mean luminance of 35 cd/m^2. Frequency and
-% contrast were allowed to vary, so they have not been set here. 
-%
+% gaussian width), and a mean luminance of 35 cd/m^2. 
+
 stimParamsDefault = struct(...
-    'orientationDegs', 0, ...               % 0 degrees
+    'spatialFrequencyCyclesPerDeg', 1.5, ...% Spatial frequency (cpd)
+    'contrast', .01, ...                    % Contrast (Michelson)
+    'orientationDegs', 0, ...               % Vertical Orientation
     'sizeDegs', 5, ...                      % Mosaic size (degrees)
     'phaseDegs', 90, ...                    % spatial phase degrees, 0 = cos, 90 = sin
     'sigmaDegs', 100, ...                   % wide Gaussian envelope
@@ -17,4 +18,4 @@ stimParamsDefault = struct(...
 
 displayDefault = displayCreate('LCD-Apple', 'viewing distance', 20/100);
 
-return
+end

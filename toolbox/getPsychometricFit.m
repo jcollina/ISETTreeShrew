@@ -1,35 +1,56 @@
-function fitResults = getPsychometricFit(contrasts,accuracy,nTrials,varargin)
+function fitResults = getPsychometricFit(feature,performance,nTrials,varargin)
+% Plot the psychometric function for a given binary search and weibull fit
+%
+% Syntax:
+%   getPsychometricFit(feature,performance,nTrials,'performanceUnits', 'percent')
+
+% Inputs:
+%   feature - x values, the feature of the stimulus that is being varied
+%   performance - y values, the performance (accuracy) as a function of the
+%   feature
+%   nTrials - number of total trials for each feature level
+  
+%
+% Optional key/value pairs:
+%   performanceThreshold - Default 0.75. What performance threshold are you
+%   interested in reporting the feature for?
+
+% See also: sampledThresholdBinarySearch, plotPsychometricFunction
+
+% History:
+%   unknown nc  Wrote initial version.
+%   05/14/19 jsc  Formatted for csf.
 
 p = inputParser;
 
-p.addParameter('accThreshold', .75, @isnumeric)
-p.addParameter('accUnits', 'percent', @ischar)
+p.addParameter('performanceThreshold', .75, @isnumeric)
+p.addParameter('performanceUnits', 'percent', @ischar)
 p.parse(varargin{:});
 
-accThreshold = p.Results.accThreshold;
-accUnits = p.Results.accUnits;
+performaceThreshold = p.Results.performanceThreshold;
+performanceUnits = p.Results.performanceUnits;
 
-switch accUnits
+switch performanceUnits
     case 'percent'
         multiplier = 1/100;
     case 'fraction'
         multiplier = 1;
     otherwise
-        error('accUnits can be percent or fraction of trials.')
+        error("performanceUnits can be 'percent' or 'fraction' of trials.")
 end
 
-if accThreshold > 1
-    accThreshold = accThreshold/100;
+if performaceThreshold > 1
+    performaceThreshold = performaceThreshold/100;
 end
 
 % Set up psychometric function model. Here we use a cumulative Weibull function
 psychometricFunctionModel = @PAL_Weibull;
 
-fractionCorrect = accuracy * multiplier;
+fractionCorrect = performance * multiplier;
 
 % Set up search grid
 gridLevels = 100;
-searchGridParams.alpha = logspace(log10(min(contrasts)),log10(max(contrasts)),gridLevels);
+searchGridParams.alpha = logspace(log10(min(feature)),log10(max(feature)),gridLevels);
 searchGridParams.beta = 10.^linspace(-4,4,gridLevels);
 searchGridParams.gamma = 0.5;
 searchGridParams.lambda = 0.0;
@@ -49,16 +70,15 @@ trialsNumCorrectPerContrastLevel = round(nTrials*fractionCorrect);
 trialsNumPerContrastLevel = repmat(nTrials,1,length(fractionCorrect));
 
 %% Fit the data and get the best fit params
-paramsValues = PAL_PFML_Fit(contrasts(:), trialsNumCorrectPerContrastLevel(:), trialsNumPerContrastLevel(:), ...
+paramsValues = PAL_PFML_Fit(feature(:), trialsNumCorrectPerContrastLevel(:), trialsNumPerContrastLevel(:), ...
     searchGridParams, paramsFree, psychometricFunctionModel, 'SearchOptions', optionsParams);
 
 % Obtain the threshold at which performance cross a threshold performance, here 75%
-performanceThreshold = accThreshold;
+performanceThreshold = performaceThreshold;
 fitResults.contrastThreshold = psychometricFunctionModel(paramsValues, performanceThreshold, 'inverse');
 
 %
 % Obtain a high resolution version of the fitted function
 fitResults.hiResContrasts = searchGridParams.alpha;
 fitResults.hiResPerformance = (1/multiplier)*PAL_Weibull(paramsValues, fitResults.hiResContrasts);
-plot(fitResults.hiResContrasts, fitResults.hiResPerformance, 'r-', 'LineWidth', 1.5);
 end

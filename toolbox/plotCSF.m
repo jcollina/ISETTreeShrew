@@ -52,7 +52,7 @@ plot(frequencyRange, sensitivity,'b.-','MarkerSize',20)
 % Plotting data from Casagrande (1984), if indicated
 if plotCasagrandeData
     hold on
-    load ts_CSF_M.mat ts_CSF_M
+    load csfData_Casagrande1984.mat ts_CSF_M
     
     ts1 = ts_CSF_M{1};
     ts2 = ts_CSF_M{2};

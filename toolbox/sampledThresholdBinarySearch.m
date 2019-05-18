@@ -1,4 +1,4 @@
-function sampledData = sampledThresholdBinarySearch(data,varargin)
+function sampledData = sampledThresholdBinarySearch(samples,performance,,varargin)
 % Sample the psychometric threshold space indicated by a binary search
 %
 % Syntax:
@@ -13,8 +13,9 @@ function sampledData = sampledThresholdBinarySearch(data,varargin)
 %
 % Inputs:
 %   thresholdSample - Matlab structure detailing SVM accuracy as a function
-%   of stimulus contrast for a set stimulus spatial frequency. With fields
-%   'contrasts', 'accuracies', 'acc_SE', 'frequency' and 'contrastRange'.
+%   of a stimulus feature. With fields
+
+%   'contrasts', 'accuracies', 'frequency' and 'contrastRange'.
   
 %
 % Optional key/value pairs:
@@ -67,7 +68,7 @@ j = 1;
 while 1
     a = data.contrasts{1,j};
     thresholdContrastsTemp = unique(round(a(stepsBeforePlotting : length(a)),4));
-    if accRange(1) < data.finalAccuracy(j) && accRange(2) > data.finalAccuracy(j)
+    if acceptedAccRange(1) < data.finalAccuracy(j) && acceptedAccRange(2) > data.finalAccuracy(j)
         if length(thresholdContrastsTemp) > minInputPoints
             thresholdContrasts = thresholdContrastsTemp;
             break;
