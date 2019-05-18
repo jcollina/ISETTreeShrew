@@ -119,7 +119,7 @@ stepsBeforePlotting = 3;
 
 % What's the minimum number of unique points you want to sample? So, the
 % points after the previous parameter.
-minInputPoints = 2;
+minInputPoints = 3;
 
 % What's the range of satisfactory accuracies you want to have reached in the original
 % search?
@@ -133,16 +133,38 @@ numOutputPoints = 5;
 % These will be evenly spaced, spanning the range of contrasts searched.
 numOtherPoints = 5;
 
+expInfo = data.expInfo;
+binaryResults = data.binaryResults;
+
 if compute
     
-    thresholdSample = sampledThresholdBinarySearch(data, ...
+i = 1;
+while 1
+    expInfo.stimParams.spatialFrequencyCyclesPerDeg = binaryResults.frequencyRange(i);
+    sampledDataTemp = resampleThresholdBinarySearch(expInfo, ...
+        'contrast', ...
+        binaryResults.contrasts{1,i}, ...
+        binaryResults.contrastRange, ...
+        binaryResults.finalAccuracy(i), ...
         'stepsBeforePlotting',stepsBeforePlotting, ...
         'acceptedAccRange',acceptedAccRange, ...
         'minInputPoints',minInputPoints, ...
         'numOtherPoints',numOtherPoints, ...
         'numOutputPoints',numOutputPoints ...
         );
+    if ~isnan(sampledDataTemp)
+        thresholdSample = sampledDataTemp;
+        break
+    end
     
+    i = i + 1;
+    if i > length(binaryResults.frequencyRange)
+        error("None of the searches in the CSF data matched the requirements.")
+    end
+end
+
+assignin('base','thresholdSample',thresholdSample)
+
     %% Fit the data with a psychometric function
     %
     % Determine number of data points used to compute each accuracy
@@ -151,7 +173,7 @@ if compute
     nTrialsNum = expInfo.nTrialsNum;
     nTrialsPerMeasure = nTrialsNum/expInfo.nFolds;
     % Fit the data
-    psychFitResults = getPsychometricFit(thresholdSample.contrasts,thresholdSample.accuracies, nTrialsPerMeasure ,'accThreshold',mean(acceptedAccRange));
+    psychFitResults = getPsychometricFit(thresholdSample.samples,thresholdSample.performance, nTrialsPerMeasure ,'accThreshold',mean(acceptedAccRange));
     
     %% Save the data, including the results of the fit
     
@@ -192,6 +214,9 @@ end
 %% Plot the psychometric function and the contrast threshold
 %
 % Either way, plot the data
-plotPsychometricFunction(thresholdSample, 'fitResults', psychFitResults)
-
+plotPsychometricFunction(thresholdSample.samples, ...
+    thresholdSample.performance, ...
+    'Contrasts (Michelson)', ...
+    'svmError',thresholdSample.performanceSE, ...
+    'fitResults', psychFitResults)
 end
