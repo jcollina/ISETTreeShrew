@@ -1,4 +1,5 @@
 function t_psychometricFromBinarySearch(varargin)
+%
 %% t_psychometricFromBinarySearch (Human/Treeshrew)
 % In Casagrande's 1984 treeshrew CSF paper, the researchers fit their data
 % of contrast vs accuracy with a psychometric function, and used it to find
@@ -20,23 +21,28 @@ function t_psychometricFromBinarySearch(varargin)
 % See also: t_BinarySearchCSF
 %
 
-% Tools used: getSVMAcc, getPsychometricFit
+% Tools used: sampledThresholdBinarySearch, getPsychometricFit,
+% plotPsychometricFunction
 %
 
 % History:
 %   04/02/19 jsc  Wrote initial version.
 
-% Load dataset created using t_BinarySearchCSF. Data must have the
+% Required dataset can be created using t_BinarySearchCSF. Data must have the
 % variables:
-%       theMosaic
-%       theOI
-%       nTrialsNum
-%       psfSigma
+%       species
+%       expInfo: struct w/
+%           theMosaic
+%           theOI
+%           nTrialsNum
+%           nFolds
+%           psfSigma
 %       binaryResults: struct w/
-%           contrastsTotal
+%           contrasts
+%           accuracies
 %           frequencyRange
 
-% What data do you want to use? This would be overwritten by function
+% What data do you want to use? This could be overwritten by function
 % input.
 
 data = load('sampleCSFData.mat');
@@ -48,20 +54,20 @@ p.addParameter('csfData', data, @isstruct)
 p.addParameter('psychData', struct, @isstruct)
 p.addParameter('dataName', char.empty, @ischar)
 p.addParameter('overwrite', false, @islogical)
+p.addParameter('saveToWS', false, @islogical)
+
 
 p.parse(varargin{:});
 data = p.Results.csfData;
 psychData = p.Results.psychData;
 dataName = p.Results.dataName;
 overwrite = p.Results.overwrite;
-
-% Load a previously generated set of data, if indicated.
+saveToWS = p.Results.saveToWS;
 
 % Assume that we are creating a new dataset, unless indicated otherwise by
 % passing a previously created psych dataset into the function.
 compute = true;
 
-% Load a previously generated set of data, if indicated.
 if ~ismember('psychData',p.UsingDefaults)
     compute = false;
     if ~isempty(dataName)
@@ -73,28 +79,15 @@ if ~ismember('csfData',p.UsingDefaults) && compute == false
     error('Either choose a psychometric function data structure to plot, or create one from binary search data.')
 end
 
-
-nTrialsNum = data.expInfo.nTrialsNum;
-nFolds = 10;%data.expInfo.nFolds;
-
-%sizeDegs = round(theMosaic.fov);
-
-% All we need now is the results of the binary search
-%data = data.binaryResults;
-
-%}
-
-%% Selecting spatial frequency to use
+%% Parameters to determine which search to use
 %
-% In the binary search dataset, you will have run the search for multiple
-% spatial frequencies. We want to find a search that fits two criteria:
-%   1)  We want the search to have a minimum number of steps (minSteps), to
-%       ensure that there are multiple points close to the threshold.
-%   2)  In the last four contrasts sampled, we want there to be at least
-%       three unique values, so that we get an idea of the slope of the
-%       psychometric function, not just a single point.
+% In the binary search dataset, there will be multiple searches, for
+% different
+% spatial frequencies. We want to find a search that fits a few criteria in
+% order to ensure we have enough different data points, and that the search
+% matches set standards.
 
-%We don't want to sample the entire field, and want to take advantage of
+%First, we don't want to sample the entire field, and want to take advantage of
 %the binary search we've already done. How many steps do we want to take
 %before deciding we're close enougn to the threshold?
 
@@ -103,7 +96,8 @@ nFolds = 10;%data.expInfo.nFolds;
 % ...
 stepsBeforePlotting = 3;
 
-% What's the minimum number of unique points you want to sample?
+% What's the minimum number of unique points you want to sample? So, the
+% points after the previous parameter.
 minInputPoints = 5;
 
 % What's the range of satisfactory accuracies you want to have reached in the original
@@ -119,22 +113,34 @@ numOutputPoints = 5;
 numOtherPoints = 5;
 
 if compute
-
-    sampledData = sampleThresholdBinarySearch(data, ...
+    
+    thresholdSample = sampledThresholdBinarySearch(data, ...
         'stepsBeforePlotting',stepsBeforePlotting, ...
-        'accRange',accRange, ...
+        'acceptedAccRange',acceptedAccRange, ...
         'minInputPoints',minInputPoints, ...
         'numOtherPoints',numOtherPoints, ...
         'numOutputPoints',numOutputPoints ...
         );
-
-    % Fit the data with a psychometric function
-    psychFitResults = getPsychometricFit(sampledData.contrasts,sampledData.accuracies, nTrialsNum/nFolds ,'accThreshold',mean(accRange));
-    % contrasts, accuracies, threshold, ntrials
-    % Save the data, including the results of the fit
     
+    %% Fit the data with a psychometric function
+    %
+    % Determine number of data points used to compute each accuracy
+    % measure
+    nTrialsPerMeasure = data.expInfo.nTrialsNum/data.expInfo.nFolds;
+    % Fit the data
+    psychFitResults = getPsychometricFit(thresholdSample.contrasts,thresholdSample.accuracies, nTrialsPerMeasure ,'accThreshold',mean(accRange));
+    
+    %% Save the data, including the results of the fit
+    
+    % Will data be saved to the workspace?
+    if saveToWS
+        assignin('base','thresholdSample',thresholdSample)
+        assignin('base','psychFitResults',psychFitResults)
+    end
+    
+    % Will the data be saved under a generic or chosen name?
     if isempty(dataName)
-        psychDataToSave = [species,sprintf('psychFn_%.0f_trials.mat',nTrialsNum)];
+        psychDataToSave = sprintf('psychFn_%.0f_trials.mat',nTrialsNum);
     elseif endsWith(dataName,'.mat')
         psychDataToSave = dataName;
     else
@@ -152,23 +158,17 @@ if compute
         psychDataToSave = psychDataToSaveTemp;
     end
     
-    thresholdSample.frequency = spatFreq;
-    thresholdSample.contrastsTotal = contrastsToFit;
-    thresholdSample.accuraciesTotal = accuraciesToFit;
-    thresholdSample.totalSE = acc_SE;
-    
     save(psychDataToSave,'nTrialsNum','thresholdSample','psychFitResults')
 else
+    % If you passed in a previously gathered dataset with the proper fields,
+    % we'll expand that here.
     thresholdSample = psychData.thresholdSample;
     psychFitResults = psychData.psychFitResults;
 end
 
-%% Psychometric function fit implementation
+%% Plot the psychometric function and the contrast threshold
 %
-% Plot the simulated data, the psychometric function, and the reported contrast threshold
-plotPsychometricFunction(thresholdSample,psychFitResults)
-
-%% Functions
-    
+% Either way, plot the data
+plotPsychometricFunction(thresholdSample, 'fitResults', psychFitResults)
 
 end

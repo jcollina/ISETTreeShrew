@@ -154,11 +154,13 @@ p.StructExpand = false;
 p.addParameter('csfDataToPlot', struct, @isstruct)
 p.addParameter('dataName', char.empty, @ischar)
 p.addParameter('overwrite', false, @islogical)
+p.addParameter('saveToWS', false, @islogical)
 
 p.parse(varargin{:});
 csfDataToPlot = p.Results.csfDataToPlot;
 dataName = p.Results.dataName;
 overwrite = p.Results.overwrite;
+saveToWS = p.Results.saveToWS;
 
 compute = true;
 
@@ -221,7 +223,7 @@ if compute
             
     end
     
-        %{
+    %{
     'fovDegs', sizeDegs);
     
     theOI = speciesOI(species,'inFocusPSFsigmaMicrons', psfSigma);
@@ -234,7 +236,7 @@ if compute
     %% Set stimulus parameters and display type to default for the csf experiment
     [stimParams,presentationDisplay] = csfStimParamsDefault();
     stimParams.sizeDegs = sizeDegs;
-
+    
     %% Main loop
     %
     % Begin looping over the discrete spatial frequencies chosen
@@ -317,25 +319,31 @@ if compute
     expInfo.theOI = theOI;
     expInfo.presentationDisplay = presentationDisplay;
     expInfo.psfSigma = psfSigma;
+    
     expInfo.nTrialsNum = nTrialsNum;
     expInfo.nTrialsNum = nFolds;
     
     binaryResults.frequencyRange = frequencyRange;
-    binaryResults.contrastsTotal = contrastsTotal;
-    binaryResults.accuraciesTotal = accuraciesTotal;
+    binaryResults.contrastRange = contrastRange;
+    
+    binaryResults.contrasts = contrastsTotal;
+    binaryResults.accuracies = accuraciesTotal;
+    
     binaryResults.thresholdContrasts = thresholdContrasts;
     binaryResults.finalAccuracy = finalAccuracy;
     binaryResults.finalSE = finalSE;
-    binaryResults.contrastRange = contrastRange;
+    
     binaryResults.time = time;
     
-    assignin('base','binaryResults',binaryResults)
-    assignin('base','expInfo',expInfo)
+    if saveToWS
+        assignin('base','binaryResults',binaryResults)
+        assignin('base','expInfo',expInfo)
+    end
     
     save(csfDataToSave,'species','expInfo','binaryResults')
 else
     % If you chose to input 'csfDataToPlot' instead of generating new data,
-    % extract the simulated experiment details and search results.    
+    % extract the simulated experiment details and search results.
     expInfo = csfDataToPlot.expInfo;
     binaryResults = csfDataToPlot.binaryResults;
 end
@@ -361,9 +369,9 @@ plotCSF(binaryResults, 'expInfo', expInfo, 'toDivide', toDivide, 'plotCasagrande
 
 %% Functions
 
-function nUpdateWaitbar(~)
-    waitbar(count/N, h);
-    count = count + 1;
-end
+    function nUpdateWaitbar(~)
+        waitbar(count/N, h);
+        count = count + 1;
+    end
 
 end

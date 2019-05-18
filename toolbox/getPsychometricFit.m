@@ -1,17 +1,31 @@
-function fitResults = getPsychometricFit(contrasts,percentCorrect,nTrials,varargin)
+function fitResults = getPsychometricFit(contrasts,accuracy,nTrials,varargin)
 
 p = inputParser;
 
-p.addParameter('accThreshold', 75, @isnumeric)
-
+p.addParameter('accThreshold', .75, @isnumeric)
+p.addParameter('accUnits', 'percent', @ischar)
 p.parse(varargin{:});
 
 accThreshold = p.Results.accThreshold;
+accUnits = p.Results.accUnits;
+
+switch accUnits
+    case 'percent'
+        multiplier = 1/100;
+    case 'fraction'
+        multiplier = 1;
+    otherwise
+        error('accUnits can be percent or fraction of trials.')
+end
+
+if accThreshold > 1
+    accThreshold = accThreshold/100;
+end
 
 % Set up psychometric function model. Here we use a cumulative Weibull function
 psychometricFunctionModel = @PAL_Weibull;
 
-fractionCorrect = percentCorrect/100;
+fractionCorrect = accuracy * multiplier;
 
 % Set up search grid
 gridLevels = 100;
@@ -36,7 +50,7 @@ trialsNumPerContrastLevel = repmat(nTrials,1,length(fractionCorrect));
 
 %% Fit the data and get the best fit params
 paramsValues = PAL_PFML_Fit(contrasts(:), trialsNumCorrectPerContrastLevel(:), trialsNumPerContrastLevel(:), ...
-            searchGridParams, paramsFree, psychometricFunctionModel, 'SearchOptions', optionsParams);
+    searchGridParams, paramsFree, psychometricFunctionModel, 'SearchOptions', optionsParams);
 
 % Obtain the threshold at which performance cross a threshold performance, here 75%
 performanceThreshold = accThreshold;
@@ -45,6 +59,6 @@ fitResults.contrastThreshold = psychometricFunctionModel(paramsValues, performan
 %
 % Obtain a high resolution version of the fitted function
 fitResults.hiResContrasts = searchGridParams.alpha;
-fitResults.hiResPerformance = 100 * PAL_Weibull(paramsValues, fitResults.hiResContrasts);
-
+fitResults.hiResPerformance = (1/multiplier)*PAL_Weibull(paramsValues, fitResults.hiResContrasts);
+plot(fitResults.hiResContrasts, fitResults.hiResPerformance, 'r-', 'LineWidth', 1.5);
 end
