@@ -85,7 +85,7 @@ cycle = 0;
 
 while 1
     
-    % Generate test stimulus based on current contrast of interest
+    % Generate test stimulus for this sample
     currentFeature = mean([minFeature,maxFeature]);
     
     stimParams.(feature) = currentFeature;

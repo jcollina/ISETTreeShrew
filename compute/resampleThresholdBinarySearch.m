@@ -31,7 +31,7 @@ function [sampledData, success] = resampleThresholdBinarySearch(expInfo,feature,
 %   acceptedAccRange - Not all searches reached the same accuracy. What
 %   would you consider acceptable?
 %   minInputPoints - Number of unique points after the stepsBeforePlotting
-%   numOtherPoints - Number of points across the full contrast range to
+%   numOtherPoints - Number of points across the full feature range to
 %   also plot
 %   numOutputPoints - Number of points to plot in the threshold
  
@@ -126,7 +126,7 @@ if success
     
     parfor i = 1:length(sampleList)
         
-        % Set the contrast level for this iteration
+        % Set the feature for this iteration
         stimParamsTemp = stimParams;  
         stimParamsTemp.(feature) = sampleList(i);
         
