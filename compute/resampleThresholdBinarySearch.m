@@ -1,4 +1,4 @@
-function sampledData = resampleThresholdBinarySearch(expInfo,feature,featureSample,featureRange,finalAccuracy,varargin)
+function [sampledData, success] = resampleThresholdBinarySearch(expInfo,feature,featureSample,featureRange,finalAccuracy,varargin)
 % Sample the psychometric threshold space indicated by a binary search
 %
 % Syntax:
@@ -72,13 +72,13 @@ end
  
 % Now, we need the results of the binary search
  
-moveOn = true;
+success = true;
  
 if acceptedAccRange(1) < finalAccuracy && acceptedAccRange(2) > finalAccuracy
     % Great, move on
 else
-    moveOn = false;
-    warning("This search didn't have a final performance within your range.")
+    success = false;
+    disp("This search didn't have a final performance within your range.")
 end
 
 thresholdFeaturesTemp = unique(round(featureSample(stepsBeforePlotting : length(featureSample)),4));
@@ -86,11 +86,11 @@ thresholdFeaturesTemp = unique(round(featureSample(stepsBeforePlotting : length(
 if length(thresholdFeaturesTemp) > minInputPoints
     thresholdFeatures = thresholdFeaturesTemp;
 else
-    moveOn = false;
-    warning("This search didn't have enough unique samples after your stepsBeforePlotting.")
+    success = false;
+    warning("This search didn't have enough unique samples given your constraints.")
 end
  
-if moveOn
+if success
     % Determine the features to analyze
     minC = min(thresholdFeatures)-range(thresholdFeatures)/2;
     maxC = max(thresholdFeatures)+range(thresholdFeatures)/2;
@@ -115,16 +115,16 @@ if moveOn
     %% Cycle through sampleList, using the SVM to calculate accuracy for each.
     
     T = tic;
-    %{
+    
     count = 1;
     N = length(sampleList);
     
     D = parallel.pool.DataQueue;
     
-    w = waitbar(0, 'Progress');
+    w = waitbar(0, [feature,' Space Resampling Progress']);
     afterEach(D, @nUpdateWaitbar);
-    %}
-    for i = 1:length(sampleList)
+    
+    parfor i = 1:length(sampleList)
         
         % Set the contrast level for this iteration
         stimParamsTemp = stimParams;  
@@ -142,11 +142,11 @@ if moveOn
         performance(i) = mean(acc);
         performanceSE(i) = std(acc)/sqrt(length(acc));
         
-        %send(D,i)
+        send(D,i)
     end
     
-    %delete(gcp)
-    %close(w)
+    delete(gcp)
+    close(w)
     
     sampledData.time = toc(T)/60;
     sampledData.feature = feature;
@@ -154,15 +154,19 @@ if moveOn
     sampledData.samples = sampleList;
     sampledData.performance = performance;
     sampledData.performanceSE = performanceSE;
+    
+
 else
-    sampledData = NaN;
+    % If the search didn't match the requirements, return an empty
+    % structure and success = false;
+    sampledData = struct;
 end
  
 %% Functions
- %{
+
 function nUpdateWaitbar(~)
 waitbar(count/N, w);
 count = count + 1;
 end
- %}
+
 end

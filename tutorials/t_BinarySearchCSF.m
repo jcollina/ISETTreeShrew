@@ -107,7 +107,7 @@ sizeDegs = 5; % degrees per side
 % sensitivities for? The Casagrande paper showed a treeshrew CSF
 % dropoff in the range of 0.75 - 2 cycles/degree, while for humans it
 % is in the range of 1 - 10 cycles/degree.
-frequencyRange = 0.75;%:0.25:2; %cycles per degree
+frequencyRange = 0.75:0.25:2; %cycles per degree
 
 % What range of contrasts do you want to explore for the spatial
 % frequencies? Make it wide enough to include accuracies other than
@@ -129,18 +129,18 @@ maxCycles = 8;
 % sensitivity. This has been shown to be at least a factor of 20. The
 % parameter toDivide simply shifts the sensitivity function downward before
 % plotting.
-
 toDivide = 20;
 
 %% SVM Specifications:
 
 % How much data do you want to use to train the SVM?
-nTrialsNum = 50;
+nTrialsNum = 250;
 
 % How many folds do you want to use for cross-validation?
 nFolds = 10;
 
 %% Parse optional input from function
+
 p = inputParser;
 p.StructExpand = false;
 p.addParameter('csfDataToPlot', struct, @isstruct)
@@ -236,7 +236,7 @@ if compute
     
     D = parallel.pool.DataQueue;
     
-    w = waitbar(0, 'Progress');
+    w = waitbar(0, 'CSF Progress');
     afterEach(D, @nUpdateWaitbar);
     
     T = tic;
@@ -248,7 +248,7 @@ if compute
         
         %% Binary Search
         
-        % Perform the search, using the binarySearchOverContrast function
+        % Perform the search, using the binarySearchOverFeature function
         searchResults = binarySearchOverFeature(...
             'contrast', ...
             contrastRange, ...

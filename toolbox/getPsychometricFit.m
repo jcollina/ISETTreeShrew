@@ -27,7 +27,7 @@ p.addParameter('performanceThreshold', .75, @isnumeric)
 p.addParameter('performanceUnits', 'percent', @ischar)
 p.parse(varargin{:});
 
-performaceThreshold = p.Results.performanceThreshold;
+performanceThreshold = p.Results.performanceThreshold;
 performanceUnits = p.Results.performanceUnits;
 
 switch performanceUnits
@@ -39,8 +39,8 @@ switch performanceUnits
         error("performanceUnits can be 'percent' or 'fraction' of trials.")
 end
 
-if performaceThreshold > 1
-    performaceThreshold = performaceThreshold/100;
+if performanceThreshold > 1
+    performanceThreshold = performanceThreshold/100;
 end
 
 % Set up psychometric function model. Here we use a cumulative Weibull function
@@ -66,19 +66,19 @@ optionsParams.Display     = 'off';
 % Parameters that are allowed to vary
 % The parameters are: threshold, slope, guess-rate, lapse-rate
 paramsFree = [1 1 0 0];
-trialsNumCorrectPerContrastLevel = round(nTrials*fractionCorrect);
-trialsNumPerContrastLevel = repmat(nTrials,1,length(fractionCorrect));
+trialsNumCorrectPerFeatureLevel = round(nTrials*fractionCorrect);
+trialsNumPerFeatureLevel = repmat(nTrials,1,length(fractionCorrect));
 
 %% Fit the data and get the best fit params
-paramsValues = PAL_PFML_Fit(feature(:), trialsNumCorrectPerContrastLevel(:), trialsNumPerContrastLevel(:), ...
+paramsValues = PAL_PFML_Fit(feature(:), trialsNumCorrectPerFeatureLevel(:), trialsNumPerFeatureLevel(:), ...
     searchGridParams, paramsFree, psychometricFunctionModel, 'SearchOptions', optionsParams);
 
 % Obtain the threshold at which performance cross a threshold performance, here 75%
-performanceThreshold = performaceThreshold;
-fitResults.contrastThreshold = psychometricFunctionModel(paramsValues, performanceThreshold, 'inverse');
+fitResults.featureThreshold = psychometricFunctionModel(paramsValues, performanceThreshold, 'inverse');
 
 %
 % Obtain a high resolution version of the fitted function
-fitResults.hiResContrasts = searchGridParams.alpha;
-fitResults.hiResPerformance = (1/multiplier)*PAL_Weibull(paramsValues, fitResults.hiResContrasts);
+fitResults.performanceThreshold = performanceThreshold*100;
+fitResults.hiResFeatures = searchGridParams.alpha;
+fitResults.hiResPerformance = (1/multiplier)*PAL_Weibull(paramsValues, fitResults.hiResFeatures);
 end

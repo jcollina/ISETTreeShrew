@@ -1,13 +1,13 @@
 function t_psychometricFromBinarySearch(varargin)
 %
 %% t_psychometricFromBinarySearch (Human/Treeshrew)
-% Use sampledThresholdBinarySearch, getPsychometricFit amd plotPsychometricFunction 
-% to confirm that binay searches actually estimate the threshold
+% Use resampleThresholdBinarySearch, getPsychometricFit and
+% plotPsychometricFunction to confirm that binary searches over certain
+% stimulus features actually estimate the threshold
 
 % Syntax:
 %   t_psychometricFromBinarySearch('csfData','load('bestCSFData.mat'))
-%   t_BinarySearchCSF('dataName','bestDataEver')
-%   t_BinarySearchCSF('csfDataToPlot',load('treeshrew_csf_250_trials.mat'))
+%   t_psychometricFromBinarySearch('psychDataToPlot',load('psychFn_250_trials.mat'))
 %
 
 % Description:
@@ -15,22 +15,22 @@ function t_psychometricFromBinarySearch(varargin)
 % of contrast vs accuracy with a psychometric function, and used it to find
 % their desired contrast threshold.
 %
-% In ISETBio, we don't have an a priori idea of the threshold location, so
-% we set a wide contrast range to search. If we evenly sampled the full
-% range, we would need a very large number of data points in order to fully
-% sample the psychometric function. Instead, we use a binary search
-% algorithm to find the desired contrast threshold, as can be seen in
-% t_BinarySearchCSF.
+% When using an SVM in ISETBio, we don't have a perfect a priori idea of
+% threshold location, so we set a wide feature range to search. If we
+% evenly sampled the full range, we would need a very large number of data
+% points in order to sample the psychometric function. Instead, we use a
+% binary search algorithm to find the desired contrast threshold, as can be
+% seen in t_BinarySearchCSF and binarySearchOverFeature.
 %
-% Nevertheless, we assume that there is an underlying psychometric
-% function. And once we've found the contrast threshold, we can sample
+% This process assumes that there is an underlying psychometric
+% function. Once we've found the stimulus threshold, we can sample
 % around that threshold and fit the local data to a psychometric function,
 % proving that our binary search does, in fact, approximate the correct
-% contrast values.
+% threshold values.
 
 % Optional key/value pairs:
 %   csfData - Binary search data (structure)
-%   psychData - Previously gathered psychometric function data, if you just
+%   psychDataToPlot - Previously gathered psychometric function data, if you just
 %       want to plot (structure)
 %   dataName - If you have a specific choice for the name of the generated
 %       data, you can input dataName as a character array.
@@ -42,7 +42,7 @@ function t_psychometricFromBinarySearch(varargin)
 % See also: t_BinarySearchCSF
 %
 
-% Tools used: sampledThresholdBinarySearch, getPsychometricFit,
+% Tools used: resampleThresholdBinarySearch, getPsychometricFit,
 % plotPsychometricFunction
 %
 
@@ -51,7 +51,6 @@ function t_psychometricFromBinarySearch(varargin)
 
 % Required csfData dataset can be created using t_BinarySearchCSF. Data must
 % have the variables:
-%       species
 %       expInfo: struct w/
 %           theMosaic
 %           theOI
@@ -60,11 +59,11 @@ function t_psychometricFromBinarySearch(varargin)
 %           psfSigma
 %       binaryResults: struct w/
 %           contrasts
+%           contrastRange
 %           accuracies
 %           frequencyRange
 
 % What data do you want to use? This could be overwritten by function
-% input.
 
 data = load('exampleCSFData.mat');
 
@@ -72,15 +71,14 @@ data = load('exampleCSFData.mat');
 p = inputParser;
 p.StructExpand = false;
 p.addParameter('csfData', data, @isstruct)
-p.addParameter('psychData', struct, @isstruct)
+p.addParameter('psychDataToPlot', struct, @isstruct)
 p.addParameter('dataName', char.empty, @ischar)
 p.addParameter('overwrite', false, @islogical)
 p.addParameter('saveToWS', false, @islogical)
 
-
 p.parse(varargin{:});
 data = p.Results.csfData;
-psychData = p.Results.psychData;
+psychDataToPlot = p.Results.psychDataToPlot;
 dataName = p.Results.dataName;
 overwrite = p.Results.overwrite;
 saveToWS = p.Results.saveToWS;
@@ -89,7 +87,7 @@ saveToWS = p.Results.saveToWS;
 % passing a previously created psych dataset into the function.
 compute = true;
 
-if ~ismember('psychData',p.UsingDefaults)
+if ~ismember('psychDataToPlot',p.UsingDefaults)
     compute = false;
     if ~isempty(dataName)
         warning('You are loading data instead of generating new data, so no new data will be saved under your chosen name.')
@@ -99,6 +97,9 @@ end
 if ~ismember('csfData',p.UsingDefaults) && compute == false
     error('Either choose a psychometric function data structure to plot, or create one from binary search data.')
 end
+
+expInfo = data.expInfo;
+binaryResults = data.binaryResults;
 
 %% Parameters to determine which search to use
 %
@@ -133,38 +134,50 @@ numOutputPoints = 5;
 % These will be evenly spaced, spanning the range of contrasts searched.
 numOtherPoints = 5;
 
-expInfo = data.expInfo;
-binaryResults = data.binaryResults;
-
 if compute
     
-i = 1;
-while 1
-    expInfo.stimParams.spatialFrequencyCyclesPerDeg = binaryResults.frequencyRange(i);
-    sampledDataTemp = resampleThresholdBinarySearch(expInfo, ...
-        'contrast', ...
-        binaryResults.contrasts{1,i}, ...
-        binaryResults.contrastRange, ...
-        binaryResults.finalAccuracy(i), ...
-        'stepsBeforePlotting',stepsBeforePlotting, ...
-        'acceptedAccRange',acceptedAccRange, ...
-        'minInputPoints',minInputPoints, ...
-        'numOtherPoints',numOtherPoints, ...
-        'numOutputPoints',numOutputPoints ...
-        );
-    if ~isnan(sampledDataTemp)
-        thresholdSample = sampledDataTemp;
-        break
+    %% Loop through the binary searches in the CSF dataset 
+    %
+    % Loop until you find one that matches the requirements, then resample
+    % using that search
+    i = 1;
+    while 1
+        expInfo.stimParams.spatialFrequencyCyclesPerDeg = binaryResults.frequencyRange(i);
+        
+        % resampleThresholdBinarySearch returns success = false if the
+        % search passed in does not match the requirements passed in,
+        % success = true if the requirements were matched and the search
+        % area was resampled
+        [sampledDataTemp,success] = resampleThresholdBinarySearch(...
+            expInfo, ...
+            'contrast', ...
+            binaryResults.contrasts{1,i}, ...
+            binaryResults.contrastRange, ...
+            binaryResults.finalAccuracy(i), ...
+            'stepsBeforePlotting',stepsBeforePlotting, ...
+            'acceptedAccRange',acceptedAccRange, ...
+            'minInputPoints',minInputPoints, ...
+            'numOtherPoints',numOtherPoints, ...
+            'numOutputPoints',numOutputPoints ...
+            );
+        
+        if success
+            thresholdSample = sampledDataTemp;
+            break
+        end
+        
+        if (i+1) > length(binaryResults.frequencyRange)
+            error("None of the searches in the CSF data matched the requirements.")
+        end  
+        
+        i = i + 1;
     end
     
-    i = i + 1;
-    if i > length(binaryResults.frequencyRange)
-        error("None of the searches in the CSF data matched the requirements.")
+    % Will data be saved to the workspace?
+    if saveToWS
+        assignin('base','thresholdSample',thresholdSample)
     end
-end
-
-assignin('base','thresholdSample',thresholdSample)
-
+    
     %% Fit the data with a psychometric function
     %
     % Determine number of data points used to compute each accuracy
@@ -172,14 +185,18 @@ assignin('base','thresholdSample',thresholdSample)
     expInfo = data.expInfo;
     nTrialsNum = expInfo.nTrialsNum;
     nTrialsPerMeasure = nTrialsNum/expInfo.nFolds;
+    
     % Fit the data
-    psychFitResults = getPsychometricFit(thresholdSample.samples,thresholdSample.performance, nTrialsPerMeasure ,'accThreshold',mean(acceptedAccRange));
+    psychFitResults = getPsychometricFit( ...
+        thresholdSample.samples, ...
+        thresholdSample.performance, ...
+        nTrialsPerMeasure, ...
+        'performanceThreshold', mean(acceptedAccRange));
     
     %% Save the data, including the results of the fit
-    
+    %
     % Will data be saved to the workspace?
     if saveToWS
-        assignin('base','thresholdSample',thresholdSample)
         assignin('base','psychFitResults',psychFitResults)
     end
     
@@ -192,7 +209,7 @@ assignin('base','thresholdSample',thresholdSample)
         psychDataToSave = strcat(dataName,'.mat');
     end
     
-    % Will the data be overwritten?
+    % Will data of the same name be overwritten?
     if ~overwrite
         k = 1;
         psychDataToSaveTemp = psychDataToSave;
@@ -207,8 +224,8 @@ assignin('base','thresholdSample',thresholdSample)
 else
     % If you passed in a previously gathered dataset with the proper fields,
     % we'll expand that here.
-    thresholdSample = psychData.thresholdSample;
-    psychFitResults = psychData.psychFitResults;
+    thresholdSample = psychDataToPlot.thresholdSample;
+    psychFitResults = psychDataToPlot.psychFitResults;
 end
 
 %% Plot the psychometric function and the contrast threshold

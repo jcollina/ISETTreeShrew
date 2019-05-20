@@ -2,20 +2,19 @@ function plotPsychometricFunction(featureSamples,performance,xLabel,varargin)
 % Plot the psychometric function for a given binary search and weibull fit
 %
 % Syntax:
-%   plotPsychometricFunction(featureSamples,performance,'Contrasts (Michelson)','fitResults','psychFitResults')
+%   plotPsychometricFunction(featureSamples,performance,'Contrasts (Michelson)','fitResults',psychFitResults)
 %
 % Inputs:
-%   xLabel
 %   featureSamples - numeric array, levels of the feature that were sampled
 %   in the search
 %   performance - numeric array, SVM results associated with the feature
 %   xLabel
-  
+
 %
 % Optional key/value pairs:
 %   fitResults - Matlab structure detailing fit of this data with fields
-%   'hiResContrast', 'hiResPerformance' and 'contrastThreshold'
-%   svmError - error in SVM accuracy, if included will be displayed as
+%   'hiResFeature', 'hiResPerformance', 'performanceThreshold' and 'featureThreshold'
+%   svmError - error in SVM accuracy- if included, will be displayed as
 %   error bars
 
 % See also:
@@ -26,57 +25,72 @@ function plotPsychometricFunction(featureSamples,performance,xLabel,varargin)
 p = inputParser;
 p.addParameter('svmError', 0 ,@isnumeric);
 p.addParameter('fitResults',struct,@isstruct);
+p.addParameter('ylim',[40,105],@isnumeric);
 p.parse(varargin{:});
 fitResults = p.Results.fitResults;
 svmError = p.Results.svmError;
 
-if ismember('fitResults',p.UsingDefaults)
-    fit = false;
-else
-    fit = true;
-end
+fit = false;
 
-if fit
-    hiResContrasts = fitResults.hiResContrasts;
-    hiResPerformance = fitResults.hiResPerformance;
-    contrastThreshold = fitResults.contrastThreshold;
+if ~ismember('fitResults',p.UsingDefaults)
+    try
+        hiResFeatures = fitResults.hiResFeatures;
+        hiResPerformance = fitResults.hiResPerformance;
+        featureThreshold = fitResults.featureThreshold;
+        performanceThreshold = fitResults.performanceThreshold;
+        fit = true;
+    catch
+        disp('fitResults did not have the proper fields.')
+    end
 end
 
 figure()
-if fit
-    plot(hiResContrasts, hiResPerformance, 'r-', 'LineWidth', 1.5);
+
+if fit    
+    plot(hiResFeatures, hiResPerformance, 'r-', 'LineWidth', 1.5);
     hold on
-    line([contrastThreshold,contrastThreshold],[40,75])
-    line([min(featureSamples),contrastThreshold],[75,75])
+    
+    line([featureThreshold,featureThreshold],[40,performanceThreshold],'Color','black','LineStyle','-')
+    line([min(featureSamples),featureThreshold],[performanceThreshold,performanceThreshold],'Color','black','LineStyle','-')
+    
+    featureSamplesLog = log10(featureSamples);
+    featureThresholdLog = log10(featureThreshold);
+    % Line seems to plot slightly to the left, so the 1.1 is a temporary fix
+    featureThresholdNorm = 1.1*(featureThresholdLog-min(featureSamplesLog))/range(featureSamplesLog);
+    performanceThresholdNorm = (performanceThreshold-min(ylim))/range(ylim);
+    x = [0.6 featureThresholdNorm];
+    y = [0.4 performanceThresholdNorm];
+    annotation('textarrow',x,y,'String',sprintf('(%.5f,%.0f)',featureThreshold,performanceThreshold),'FontSize',14,'FontWeight','bold')
+    
+    set(gca,'xlim',[min(featureSamples),max(featureSamples)], 'XScale', 'log')
+    set(gca, 'XTick', unique([featureThreshold, min(featureSamples),max(featureSamples),get(gca, 'XTick')]));
+    
     plot(featureSamples,performance, 'ko', 'MarkerSize', 8, ...
         'MarkerFaceColor', [0.5 0.5 0.5], 'MarkerEdgeColor', [0 0 0]);
-else
+else    
     plot(featureSamples,performance, 'ko', 'MarkerSize', 8, ...
         'MarkerFaceColor', [0.5 0.5 0.5], 'MarkerEdgeColor', [0 0 0]);
     hold on
+    
+    set(gca,'xlim',[min(featureSamples),max(featureSamples)], 'XScale', 'log')
+    set(gca, 'XTick', unique([min(featureSamples),max(featureSamples),get(gca, 'XTick')]));
 end
 
 if ~ismember('svmError',p.UsingDefaults)
-    errorbar(featureSamples,performance,thresholdSample.acc_SE)
+    errorbar(featureSamples,performance,svmError)
 end
 
-%{
-if max(featureSamples) > .031
-    set(gca,'xlim',[min(featureSamples),max(featureSamples)])
-    contrastTicks = [0.005,0.01 0.02 0.03, max(featureSamples) ];
-    contrastTickLabels = {'0.005','.01', '.02', '.03', int2str(round(maxContrastsToPlot))};
-else
-    set(gca,'xlim',[min(featureSamples),.03])
-    contrastTicks = [0.005 0.01 0.02 0.03];
-    contrastTickLabels = {'0.005', '.01',  '.02',  '.03'};
+xt = get(gca, 'XTick');
+xtl = cell([1,length(xt)]);
+for i = 1:length(xt)
+    xtl{i} = num2str(round(xt(i),5));
 end
-%}
-set(gca,'xlim',[min(featureSamples),max(featureSamples)])
-%set(gca, 'XTick', contrastTicks, 'XTickLabel', contrastTickLabels);
-set(gca, 'YLim', [40 105], 'XScale', 'log')
+set(gca, 'XTickLabels', xtl);
+set(gca, 'YLim', ylim)
 set(gca, 'FontSize', 16)
 xlabel(xLabel);
 ylabel('Performance (% Detected)');
-title('Individual Psychometric Function')
+title('Psychometric Function')
+
 hold off
 end

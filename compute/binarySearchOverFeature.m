@@ -26,7 +26,6 @@ function searchResults = binarySearchOverFeature(feature,featureRange,theMosaic,
 %   stimParams - uses csfStimParamsDefault as default. What stimulus are you
 %   showing the SVM? Only one feature will change.
 %   presentationDisplay - uses csfStimParamsDefault as default. 
-%   desiredAccRange - What do you consider the threshold to be?
 %   desiredAccRange - Default [74.5,75.5] (%). What is the performance threshold?
 %   maxCycles - Maximum number of steps before taking best available
 %   approximation.
