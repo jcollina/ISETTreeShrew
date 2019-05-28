@@ -1,11 +1,31 @@
-function [rightAngHuman,rightConeDensityHuman] = getRightHumanCD(~)
+function [rightAngHuman,rightConeDensityHuman] = getRightHumanCD(varargin)
 % 
 % Use the coneDensityReadData function to get cone Density as a function of
 % visual angle for the right human eye
 
 % Parameters:
-singleEyeFOV = 160;
 
+% Parse inputs
+p = inputParser;
+p.addParameter('rightEyeFOV', 160, @isnumeric)
+p.addParameter('focalLength', 17, @isnumeric)
+
+
+
+p.parse(varargin{:});
+stepsBeforePlotting = p.Results.stepsBeforePlotting;
+minInputPoints = p.Results.minInputPoints;
+numOutputPoints = p.Results.numOutputPoints;
+numOtherPoints = p.Results.numOtherPoints;
+acceptedAccRange = p.Results.acceptedAccRange;
+
+
+% In order to get units of cones/mm to units of cones per visual angle, we
+% need to multiply by some internal distance (in this case, an
+% approximation for the size of the retina) and divide by an external
+% correspondent (here, the total field of view of the eye).
+
+singleEyeFOV = 160;
 focalLength = 17;
  
 % Calculate Cone Density
